@@ -4,7 +4,8 @@ from PySide6.QtWidgets import QDialog, QTreeView, QWidget
 
 from components.tree import TreeModel
 from components.tree.roots import mesh_root
-from dialog.mesh.factory import (
+from dialog.mesh_edit.factory import create_mesh_edit_dialog
+from dialog.mesh_import.factory import (
     create_elevation_import_dialog,
     create_mesh_import_dialog,
 )
@@ -64,6 +65,18 @@ class MeshImportController:
             return None
         return self._queue_import(model)
 
+    def edit_mesh(self, mesh_object: MeshObject):
+        """Edit an existing mesh after the dialog is accepted."""
+        dialog = create_mesh_edit_dialog(mesh_object, parent=self.parent)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+
+        edited_model = dialog.update_model()
+        edited_mesh = edited_model.apply()
+        self.object_importer.persist_block(edited_mesh.mesh_block_object)
+        self.tree_view.model().refresh()
+        return edited_mesh
+
     def _queue_import(self, model) -> Optional[EngineTask]:
         """Queue a mesh model and register it after engine processing."""
 
@@ -105,6 +118,7 @@ class MeshImportController:
             options.append(("Import mesh from 3D object", self.import_mesh))
             options.append(("Import Mesh from elevation data", self.import_elevation))
         elif isinstance(node.node_object, MeshObject):
+            options.append(("Edit Mesh", lambda: self.edit_mesh(node.node_object)))
             options.append(("Show in scene", lambda: self.show_mesh(node.node_object)))
             options.append(("Delete", lambda: self.delete_mesh(node.node_object)))
         return create_dropdown_menu(options, parent)

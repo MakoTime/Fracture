@@ -1,7 +1,7 @@
 from tools.widgets import VisibleWidget
 from components.table import TableView
-from dialog.mesh.model import MeshImportModel
-from dialog.mesh.view import MeshImportView
+from dialog.mesh_import.model import MeshImportModel
+from dialog.mesh_import.view import MeshImportView
 from objects.object_base import ObjectBase
 
 

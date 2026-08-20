@@ -6,7 +6,8 @@ from PySide6.QtGui import QColor, QImage
 from components.table import TableManager, TableModel
 from components.tree import TreeModel
 from components.tree.roots import mesh_root, root_objects
-from dialog.mesh.model import MeshImportModel
+from dialog.mesh_import.model import MeshImportModel
+from dialog.mesh_edit.model import MeshEditModel
 from engine.block_objects import MeshBlockObject
 from engine.block_tasks import MeshImportTask
 from objects.mesh_object import MeshObject
@@ -61,6 +62,40 @@ def test_mesh_root_menu_separates_import_types(qapp):
         "Import mesh from 3D object",
         "Import Mesh from elevation data",
     ]
+
+
+def test_mesh_object_menu_includes_edit_action(qapp):
+    controller = MeshImportController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+    mesh_object = MeshImportModel(mesh_data=object()).to_mesh_object()
+
+    menu = controller.create_context_menu(mesh_object.node)
+
+    assert [action.text() for action in menu.actions()] == [
+        "Edit Mesh",
+        "Show in scene",
+        "Delete",
+    ]
+
+
+def test_mesh_edit_model_updates_existing_mesh(qapp):
+    mesh_object = MeshImportModel(
+        name="Original",
+        comments="old",
+        mesh_data=object(),
+    ).to_mesh_object()
+    model = MeshEditModel.from_mesh_object(mesh_object)
+    model.name = "Edited"
+    model.comments = "new"
+    model.scale = (2.0, 2.0, 2.0)
+
+    assert model.apply() is mesh_object
+    assert mesh_object.name == "Edited"
+    assert mesh_object.comments == "new"
+    assert mesh_object.scale == (2.0, 2.0, 2.0)
+    assert mesh_object.node.name == "Edited"
 
 
 def test_object_base_registers_as_global_root_by_default(qapp):

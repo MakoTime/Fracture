@@ -9,7 +9,7 @@ from application.project_version import upgrade_project_data
 from components.table import TableManager, TableModel
 from components.tree import TreeManager, TreeModel
 from components.tree.roots import mesh_root, root_objects
-from dialog.mesh.model import MeshImportModel
+from dialog.mesh_import.model import MeshImportModel
 from engine.block_objects import MeshBlockObject
 from objects.mesh_object import MeshObject
 
