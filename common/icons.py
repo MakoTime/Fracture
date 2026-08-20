@@ -20,6 +20,14 @@ GRID_ICON = _icon("grid.svg")
 INFO_ICON = _icon("info.svg")
 MAP_ICON = _icon("map.svg")
 NOTES_ICON = _icon("notes.svg")
+PAUSE_ICON = _icon("pause.svg")
+PLAY_ICON = _icon("play.svg")
+REWIND_ICON = _icon("rewind.svg")
+FAST_FORWARD_ICON = _icon("fast_forward.svg")
+REWIND_2_ICON = _icon("rewind_2.svg")
+REWIND_3_ICON = _icon("rewind_3.svg")
+FAST_FORWARD_2_ICON = _icon("fast_forward_2.svg")
+FAST_FORWARD_3_ICON = _icon("fast_forward_3.svg")
 RAIN_UMBRELLA_ICON = _icon("rain_umbrella.svg")
 SAVE_ICON = _icon("save.svg")
 VISIBLE_ICON = _icon("visible.svg")
@@ -37,6 +45,14 @@ ICONS = {
 	"info": INFO_ICON,
 	"map": MAP_ICON,
 	"notes": NOTES_ICON,
+	"pause": PAUSE_ICON,
+	"play": PLAY_ICON,
+	"rewind": REWIND_ICON,
+	"fast_forward": FAST_FORWARD_ICON,
+	"rewind_2": REWIND_2_ICON,
+	"rewind_3": REWIND_3_ICON,
+	"fast_forward_2": FAST_FORWARD_2_ICON,
+	"fast_forward_3": FAST_FORWARD_3_ICON,
 	"rain_umbrella": RAIN_UMBRELLA_ICON,
 	"save": SAVE_ICON,
 	"visible": VISIBLE_ICON,

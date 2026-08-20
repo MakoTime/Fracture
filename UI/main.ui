@@ -45,6 +45,17 @@
      </layout>
     </widget>
   </widget>
+  <widget class="QDockWidget" name="worldStateDockWidget">
+   <property name="minimumSize">
+    <size><width>220</width><height>120</height></size>
+   </property>
+   <property name="allowedAreas">
+    <set>Qt::DockWidgetArea::RightDockWidgetArea</set>
+   </property>
+   <property name="windowTitle"><string>World State</string></property>
+   <attribute name="dockWidgetArea"><number>2</number></attribute>
+   <widget class="WorldStateView" name="worldStateView"/>
+  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -107,6 +118,11 @@
    <class>EngineRunner</class>
    <extends>QWidget</extends>
    <header>engine.engine_view</header>
+  </customwidget>
+  <customwidget>
+   <class>WorldStateView</class>
+   <extends>QWidget</extends>
+   <header>components.world_state</header>
   </customwidget>
  </customwidgets>
  <resources/>

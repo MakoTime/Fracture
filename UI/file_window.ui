@@ -30,6 +30,7 @@
    <item>
     <layout class="QHBoxLayout" name="buttonsLayout">
     <item><spacer name="buttonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+      <item><widget class="QPushButton" name="newButton"><property name="text"><string>New project...</string></property></widget></item>
      <item><widget class="QPushButton" name="browseButton"><property name="text"><string>Open project...</string></property></widget></item>
      <item><widget class="QPushButton" name="openButton"><property name="text"><string>Open selected</string></property><property name="default"><bool>true</bool></property></widget></item>
      <item><widget class="QPushButton" name="cancelButton"><property name="text"><string>Quit</string></property></widget></item>

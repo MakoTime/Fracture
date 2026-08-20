@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from engine.task import EngineTask, EngineTaskModel, TaskStatus
+from tools.widgets import PlayPauseWidget
 
 
 class EngineRunner(QWidget):
@@ -17,16 +18,13 @@ class EngineRunner(QWidget):
         self.task_model.task_finished.connect(self._remove_completed_task)
 
     def _build_ui(self):
-        self.play_button = QPushButton("Play")
-        self.pause_button = QPushButton("Pause")
+        self.play_pause_button = PlayPauseWidget(playing=True)
         self.state_label = QLabel("Running")
-        self.play_button.clicked.connect(self.play)
-        self.pause_button.clicked.connect(self.pause)
+        self.play_pause_button.toggled.connect(self._set_playing)
 
         controls = QHBoxLayout()
         controls.setContentsMargins(0, 0, 0, 0)
-        controls.addWidget(self.play_button)
-        controls.addWidget(self.pause_button)
+        controls.addWidget(self.play_pause_button)
         controls.addWidget(self.state_label)
         controls.addStretch(1)
 
@@ -42,12 +40,18 @@ class EngineRunner(QWidget):
         layout.addWidget(self.task_table)
 
     def play(self):
-        self.task_model.play()
-        self.state_label.setText("Running")
+        self.play_pause_button.set_playing(True)
 
     def pause(self):
-        self.task_model.pause()
-        self.state_label.setText("Paused")
+        self.play_pause_button.set_playing(False)
+
+    def _set_playing(self, playing):
+        if playing:
+            self.task_model.play()
+            self.state_label.setText("Running")
+        else:
+            self.task_model.pause()
+            self.state_label.setText("Paused")
 
     def enqueue_task(self, name, work, on_finished=None) -> EngineTask:
         return self.task_model.enqueue(name, work, on_finished=on_finished)

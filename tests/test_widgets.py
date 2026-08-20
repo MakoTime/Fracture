@@ -1,7 +1,16 @@
-from tools.widgets import VisibleWidget
+from PySide6.QtCore import QDate, QTime
+
+from tools.widgets import (
+    FastForwardWidget,
+    MediaControlsWidget,
+    PlayPauseWidget,
+    RewindWidget,
+    VisibleWidget,
+)
 from components.table import TableView
 from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_import.view import MeshImportView
+from components.world_state import WorldStateView
 from objects.object_base import ObjectBase
 
 
@@ -11,6 +20,133 @@ def test_visible_widget_starts_with_invisible_state(qapp):
     assert widget.is_visible() is False
     assert widget.toolTip() == "Show object"
     assert not widget.icon().isNull()
+
+
+def test_play_pause_widget_switches_icon_and_tooltip(qapp):
+    widget = PlayPauseWidget()
+
+    assert widget.is_playing() is False
+    assert widget.toolTip() == "Play"
+    assert not widget.icon().isNull()
+
+    widget.click()
+    assert widget.is_playing() is True
+    assert widget.toolTip() == "Pause"
+
+    widget.set_playing(False)
+    assert widget.toolTip() == "Play"
+
+
+def test_world_state_view_has_transport_controls_in_order(qapp):
+    view = WorldStateView()
+
+    assert view.rewind_button.toolTip() == "Rewind (1x)"
+    assert view.play_pause_button.toolTip() == "Play"
+    assert view.fast_forward_button.toolTip() == "Fast forward (1x)"
+    assert not view.rewind_button.icon().isNull()
+    assert not view.fast_forward_button.icon().isNull()
+
+
+def test_stepped_transport_widgets_cycle_to_three_speeds(qapp):
+    rewind = RewindWidget()
+    fast_forward = FastForwardWidget()
+
+    rewind.click()
+    fast_forward.click()
+    assert rewind.speed() == 2
+    assert fast_forward.speed() == 2
+    assert rewind.toolTip() == "Rewind (2x)"
+
+    rewind.click()
+    fast_forward.click()
+    assert rewind.speed() == 3
+    assert fast_forward.speed() == 3
+
+    rewind.click()
+    fast_forward.click()
+    assert rewind.speed() == 1
+    assert fast_forward.speed() == 1
+
+
+def test_media_controls_reset_other_widgets_on_interaction(qapp):
+    controls = MediaControlsWidget()
+
+    controls.rewind_button.click()
+    assert controls.rewind_button.speed() == 2
+    assert controls.play_pause_button.is_playing() is False
+    assert controls.fast_forward_button.speed() == 1
+
+    controls.play_pause_button.click()
+    assert controls.play_pause_button.is_playing() is True
+    assert controls.rewind_button.speed() == 1
+    assert controls.fast_forward_button.speed() == 1
+
+    controls.fast_forward_button.click()
+    assert controls.fast_forward_button.speed() == 2
+    assert controls.rewind_button.speed() == 1
+    assert controls.play_pause_button.is_playing() is False
+
+    controls.play_pause_button.click()
+    assert controls.play_pause_button.is_playing() is True
+    assert controls.rewind_button.speed() == 1
+    assert controls.fast_forward_button.speed() == 1
+
+
+def test_world_state_view_has_time_above_date(qapp):
+    view = WorldStateView()
+
+    assert view.time_spinbox.displayFormat() == "HH:mm:ss"
+    assert view.date_spinbox.displayFormat() == "yyyy-MM-dd"
+    assert [view.rate_combo.itemData(index) for index in range(view.rate_combo.count())] == [
+        "seconds",
+        "minutes",
+        "hours",
+        "days",
+        "months",
+        "years",
+    ]
+
+
+def test_world_state_media_controls_advance_selected_time(qapp):
+    view = WorldStateView()
+    view.date_spinbox.setDate(QDate(2026, 1, 31))
+    view.time_spinbox.setTime(QTime(23, 59, 59))
+
+    view.rate_combo.setCurrentIndex(0)
+    view.play_pause_button.click()
+    view._advance_time(1000)
+    assert view.date_spinbox.date() == QDate(2026, 2, 1)
+    assert view.time_spinbox.time() == QTime(0, 0, 0)
+
+    view.fast_forward_button.click()
+    view._advance_time(1000)
+    assert view.time_spinbox.time() == QTime(0, 0, 2)
+
+    view.fast_forward_button.click()
+    view._advance_time(1000)
+    assert view.time_spinbox.time() == QTime(0, 0, 6)
+
+    view.fast_forward_button.click()
+    view._advance_time(1000)
+    assert view.time_spinbox.time() == QTime(0, 0, 14)
+
+    view.rate_combo.setCurrentIndex(4)
+    view._advance_time(1000)
+    assert view.date_spinbox.date() == QDate(2026, 10, 1)
+
+
+def test_world_state_time_advancement_interpolates(qapp):
+    view = WorldStateView()
+    view.date_spinbox.setDate(QDate(2026, 1, 1))
+    view.time_spinbox.setTime(QTime(0, 0, 0))
+
+    view.play_pause_button.click()
+    view._advance_time(500)
+
+    assert view.time_spinbox.time() == QTime(0, 0, 0, 500)
+
+    view._advance_time(500)
+    assert view.time_spinbox.time() == QTime(0, 0, 1, 0)
 
 
 def test_visible_widget_switches_icon_state_and_highlights(qapp):

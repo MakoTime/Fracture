@@ -23,7 +23,22 @@ class ProjectEntry:
 
     @property
     def name(self) -> str:
-        return self.path.parent.name or self.path.stem
+        return _project_name(self.path)
+
+
+def _project_name(path: Path) -> str:
+    """Use a custom project filename, or the folder for project.json files."""
+    if path.name.lower() == "project.json":
+        return path.parent.name or path.stem
+    return path.stem or path.parent.name
+
+
+def _new_project_file(selection: str | Path) -> Path:
+    """Convert a new-project name into ``ProjectFolder/project.json``."""
+    project_directory = Path(selection)
+    if project_directory.suffix.lower() == ".json":
+        project_directory = project_directory.with_suffix("")
+    return project_directory / "project.json"
 
 
 class RecentProjectStore:
@@ -177,9 +192,17 @@ class ProjectPreview(QLabel):
 class FileWindow:
     """Coordinate the project picker UI loaded from ``file_window.ui``."""
 
-    def __init__(self, window, store: RecentProjectStore | None = None):
+    def __init__(
+        self,
+        window,
+        store: RecentProjectStore | None = None,
+        on_project_opened=None,
+        on_project_created=None,
+    ):
         self.window = window
         self.store = store or RecentProjectStore()
+        self.on_project_opened = on_project_opened
+        self.on_project_created = on_project_created
         self.entries = self.store.load()
         self.selected_project: Path | None = None
         self.list_model = ProjectListModel(self.entries)
@@ -190,6 +213,7 @@ class FileWindow:
             self._selection_changed
         )
         self.window.openButton.clicked.connect(self.open_selected)
+        self.window.newButton.clicked.connect(self.new_project)
         self.window.browseButton.clicked.connect(self.browse_project)
         self.window.cancelButton.clicked.connect(self.window.reject)
         self.window.recentProjectsTable.doubleClicked.connect(
@@ -217,7 +241,7 @@ class FileWindow:
             self.metadata_model.set_metadata([("Error", str(error))])
             return
 
-        self.window.previewTitle.setText(path.parent.name or path.stem)
+        self.window.previewTitle.setText(_project_name(path))
         objects = data.get("objects", [])
         scene_objects = [item for item in objects if item.get("in_scene")]
         rows = [
@@ -272,7 +296,7 @@ class FileWindow:
             return
         self.selected_project = self.entries[index.row()].path
         self.store.remember(self.selected_project)
-        self.window.accept()
+        self._finish_open()
 
     def browse_project(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -286,7 +310,28 @@ class FileWindow:
         project_path = Path(path)
         self.store.remember(project_path)
         self.selected_project = project_path
-        self.window.accept()
+        self._finish_open()
+
+    def new_project(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self.window,
+            "New RainFall Project",
+            str(Path.home() / "project.json"),
+            "RainFall projects (project.json);;JSON files (*.json)",
+        )
+        if not path:
+            return
+        project_path = _new_project_file(path)
+        self.store.remember(project_path)
+        self.selected_project = project_path
+        if self.on_project_created:
+            self.on_project_created(project_path)
+
+    def _finish_open(self):
+        if self.on_project_opened:
+            self.on_project_opened(self.selected_project)
+        else:
+            self.window.accept()
 
 
 def create_file_window(window):

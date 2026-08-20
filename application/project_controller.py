@@ -22,7 +22,7 @@ class ProjectController:
         self.project_serializer = ProjectSerializer()
         self.project_file = None
 
-    def setup(self):
+    def setup(self, menu_bar=None):
         """Connect the loaded widgets and initialize project features."""
         self.tree_manager.root_nodes = root_objects.get_nodes()
         self.window.table_manager = self.table_manager
@@ -36,6 +36,9 @@ class ProjectController:
         self.window.tableView.clicked.connect(self.table_model.handle_click)
         self.window.scene_viewer = self.window.centralWidget()
         self.window.engine_runner = self.window.engineRunner
+        self.window.worldStateView.set_scene_model(
+            self.window.scene_viewer.scene_model
+        )
         self.object_importer = ObjectImporterModel(
             table_model=self.table_model,
             tree_manager=self.tree_manager,
@@ -49,16 +52,17 @@ class ProjectController:
                 engine_runner=self.window.engine_runner,
             )
         )
-        setup_menu(self.window)
-        self.window.save_action.triggered.connect(
-            lambda checked=False: self.save_project()
-        )
-        self.window.save_as_action.triggered.connect(
-            lambda checked=False: self.save_project_as()
-        )
-        self.window.open_action.triggered.connect(
-            lambda checked=False: self.open_project()
-        )
+        if menu_bar is None:
+            setup_menu(self.window)
+            self.window.save_action.triggered.connect(
+                lambda checked=False: self.save_project()
+            )
+            self.window.save_as_action.triggered.connect(
+                lambda checked=False: self.save_project_as()
+            )
+            self.window.open_action.triggered.connect(
+                lambda checked=False: self.open_project()
+            )
         return self.window
 
     def save_project(self):
@@ -93,6 +97,17 @@ class ProjectController:
         project_file = selected_files[0] if selected_files else ""
         if not project_file:
             return None
+        saved_file = self.project_serializer.save(
+            project_file,
+            self.table_model,
+            self.window.scene_viewer,
+        )
+        self.project_file = saved_file
+        self._set_block_data_directory(saved_file)
+        return saved_file
+
+    def create_project(self, project_file):
+        """Create an empty project and make it the active save target."""
         saved_file = self.project_serializer.save(
             project_file,
             self.table_model,
