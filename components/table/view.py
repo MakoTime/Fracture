@@ -29,9 +29,14 @@ class TableView(QTableView):
                     )
                 )
                 self.setIndexWidget(index, widget)
-            widget.set_visible(
-                self.table_manager.get_data()[row].visible.visible
+            object_base = self.table_manager.get_data()[row].obj.obj
+            block_object = getattr(object_base, "block_object", None)
+            visible = getattr(
+                block_object,
+                "visible",
+                self.table_manager.get_data()[row].visible.visible,
             )
+            widget.set_visible(visible)
 
     def _set_row_visibility(self, row, visible):
         index = self.table_model.index(row, self.table_model.VISIBLE)

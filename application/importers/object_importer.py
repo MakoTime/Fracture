@@ -10,6 +10,13 @@ class ObjectImporterModel:
         self.table_model = table_model
         self.tree_manager = tree_manager
         self.scene_viewer = scene_viewer
+        self.block_data_directory = None
+
+    def persist_block(self, block_object):
+        """Persist a processed block when the active project has storage."""
+        if self.block_data_directory is None:
+            return None
+        return block_object.serialise_to_directory(self.block_data_directory)
 
     def register(
         self,
@@ -36,6 +43,11 @@ class ObjectImporterModel:
         object_base.remove_from_tree()
         return object_base
 
-    def bind_registered_features(self, tree_view, parent=None):
+    def bind_registered_features(self, tree_view, parent=None, engine_runner=None):
         """Bind all discovered feature importers to this project."""
-        return ImportBindingRegistry.bind_all(self, tree_view, parent)
+        return ImportBindingRegistry.bind_all(
+            self,
+            tree_view,
+            parent,
+            engine_runner,
+        )

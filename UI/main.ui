@@ -75,7 +75,13 @@
     <widget class="QWidget" name="sceneDockContents">
      <layout class="QVBoxLayout" name="sceneLayout">
       <item>
-      <widget class="TableView" name="tableView"/>
+      <widget class="QSplitter" name="sceneSplitter">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <widget class="EngineRunner" name="engineRunner"/>
+             <widget class="TableView" name="tableView"/>
+      </widget>
       </item>
      </layout>
     </widget>
@@ -96,6 +102,11 @@
    <class>TableView</class>
    <extends>QTableView</extends>
    <header>components.table.view</header>
+  </customwidget>
+  <customwidget>
+   <class>EngineRunner</class>
+   <extends>QWidget</extends>
+   <header>engine.engine_view</header>
   </customwidget>
  </customwidgets>
  <resources/>

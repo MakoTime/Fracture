@@ -6,13 +6,15 @@ def setup_menu(main_window):
 	file_menu = main_window.menuFile
 	edit_menu = main_window.menuEdit
 
-	open_action = QAction("Open", main_window)
+	open_action = QAction("Open Project", main_window)
 	save_action = QAction("Save", main_window)
+	save_as_action = QAction("Save As...", main_window)
 	exit_action = QAction("Exit", main_window)
 	exit_action.triggered.connect(main_window.close)
 
 	file_menu.addAction(open_action)
 	file_menu.addAction(save_action)
+	file_menu.addAction(save_as_action)
 	file_menu.addSeparator()
 	file_menu.addAction(exit_action)
 
@@ -23,6 +25,7 @@ def setup_menu(main_window):
 
 	main_window.open_action = open_action
 	main_window.save_action = save_action
+	main_window.save_as_action = save_as_action
 	main_window.exit_action = exit_action
 	main_window.undo_action = undo_action
 	main_window.redo_action = redo_action
@@ -30,6 +33,7 @@ def setup_menu(main_window):
 	return {
 		"open": open_action,
 		"save": save_action,
+		"save_as": save_as_action,
 		"exit": exit_action,
 		"undo": undo_action,
 		"redo": redo_action,

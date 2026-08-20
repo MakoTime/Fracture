@@ -59,7 +59,7 @@ class TreeModel(QAbstractItemModel):
             return None
         node = index.internalPointer()
         if role == Qt.DisplayRole:
-            return node.name
+            return getattr(node.node_object, "name", node.name)
         if role == Qt.DecorationRole:
             return node.icon
         return None

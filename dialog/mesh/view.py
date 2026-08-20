@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QDoubleSpinBox,
     QTextEdit,
     QVBoxLayout,
 )
@@ -24,7 +25,10 @@ from .model import MeshImportModel
 class MeshImportView(QDialog):
     """Dialog for reviewing mesh metadata and transform values."""
 
-    MESH_FILTER = "Mesh files (*.obj *.stl *.ply *.vtk *.vtp *.vtu *.glb *.gltf);;All files (*)"
+    MESH_FILTER = (
+        "Mesh files (*.obj *.stl *.ply *.vtk *.vtp *.vtu *.glb *.gltf);;"
+        "All files (*)"
+    )
 
     def __init__(self, model: MeshImportModel, parent=None):
         super().__init__(parent)
@@ -121,3 +125,55 @@ class MeshImportView(QDialog):
             self.source_path.setText(path)
             if self.name.text().strip() in ("", "Imported Mesh"):
                 self.name.setText(Path(path).stem)
+
+
+class ElevationImportView(MeshImportView):
+    """Dialog for importing a grayscale image as elevation data."""
+
+    MESH_FILTER = "Elevation images (*.bmp *.jpg *.jpeg *.png *.tif *.tiff);;All files (*)"
+
+    def __init__(self, model: MeshImportModel, parent=None):
+        super().__init__(model, parent)
+        self.setWindowTitle("Import Mesh from Elevation Data")
+        self._build_elevation_controls()
+        self.set_model(model)
+
+    def _build_elevation_controls(self):
+        self.low_threshold = QDoubleSpinBox()
+        self.low_threshold.setRange(0.0, 255.0)
+        self.low_threshold.setDecimals(2)
+        self.high_threshold = QDoubleSpinBox()
+        self.high_threshold.setRange(0.0, 255.0)
+        self.high_threshold.setDecimals(2)
+        self.vertical_scale = QDoubleSpinBox()
+        self.vertical_scale.setRange(0.0, 10000.0)
+        self.vertical_scale.setDecimals(3)
+        self.vertical_scale.setSingleStep(0.1)
+        self.low_threshold.valueChanged.connect(
+            self.high_threshold.setMinimum
+        )
+        self.high_threshold.valueChanged.connect(
+            self.low_threshold.setMaximum
+        )
+
+        controls = QFormLayout()
+        controls.addRow("Low threshold", self.low_threshold)
+        controls.addRow("High threshold", self.high_threshold)
+        controls.addRow("Vertical scale", self.vertical_scale)
+        group = QGroupBox("Elevation mapping")
+        group.setLayout(controls)
+        self.layout().insertWidget(self.layout().count() - 1, group)
+
+    def set_model(self, model: MeshImportModel):
+        super().set_model(model)
+        if hasattr(self, "low_threshold"):
+            self.low_threshold.setValue(model.low_threshold)
+            self.high_threshold.setValue(model.high_threshold)
+            self.vertical_scale.setValue(model.vertical_scale)
+
+    def update_model(self) -> MeshImportModel:
+        super().update_model()
+        self.model.low_threshold = self.low_threshold.value()
+        self.model.high_threshold = self.high_threshold.value()
+        self.model.vertical_scale = self.vertical_scale.value()
+        return self.model

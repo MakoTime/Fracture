@@ -106,7 +106,7 @@ class TableModel(QAbstractTableModel):
         column = index.column()
         if role == Qt.DisplayRole:
             if column == self.NAME:
-                return row_data.name
+                return getattr(row_data.obj.obj, "name", row_data.name)
             if column == self.OBJECT:
                 return row_data.obj.obj
             if column == self.PROGRESS:

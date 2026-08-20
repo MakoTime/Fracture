@@ -1,14 +1,66 @@
 from types import SimpleNamespace
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QImage
 
 from components.table import TableManager, TableModel
 from components.tree import TreeModel
 from components.tree.roots import mesh_root, root_objects
 from dialog.mesh.model import MeshImportModel
+from engine.block_objects import MeshBlockObject
+from engine.block_tasks import MeshImportTask
 from objects.mesh_object import MeshObject
 from application.importers import MeshImportController, ObjectImporterModel
 from objects.object_base import ObjectBase
+
+
+def test_bitmap_elevation_map_creates_structured_grid(qapp, tmp_path):
+    image = QImage(2, 2, QImage.Format.Format_RGB32)
+    image.setPixelColor(0, 0, QColor(0, 0, 0))
+    image.setPixelColor(1, 0, QColor(64, 64, 64))
+    image.setPixelColor(0, 1, QColor(128, 128, 128))
+    image.setPixelColor(1, 1, QColor(255, 255, 255))
+    source_path = tmp_path / "elevation.png"
+    assert image.save(str(source_path))
+
+    model = MeshImportModel(source_path=str(source_path))
+    mesh = MeshImportController._load_mesh(model)
+
+    assert mesh.dimensions == (2, 2, 1)
+    assert mesh.n_points == 4
+    assert mesh.points[:, 2].tolist() == [0.0, 64.0, 128.0, 255.0]
+
+
+def test_elevation_settings_threshold_and_scale_mesh(qapp, tmp_path):
+    image = QImage(2, 1, QImage.Format.Format_RGB32)
+    image.setPixelColor(0, 0, QColor(10, 10, 10))
+    image.setPixelColor(1, 0, QColor(200, 200, 200))
+    source_path = tmp_path / "thresholded.png"
+    assert image.save(str(source_path))
+
+    model = MeshImportModel(
+        source_path=str(source_path),
+        low_threshold=50,
+        high_threshold=100,
+        vertical_scale=2,
+    )
+    mesh = MeshImportController._load_mesh(model)
+
+    assert mesh.points[:, 2].tolist() == [100.0, 200.0]
+
+
+def test_mesh_root_menu_separates_import_types(qapp):
+    controller = MeshImportController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+
+    menu = controller.create_context_menu(mesh_root)
+
+    assert [action.text() for action in menu.actions()] == [
+        "Import mesh from 3D object",
+        "Import Mesh from elevation data",
+    ]
 
 
 def test_object_base_registers_as_global_root_by_default(qapp):
@@ -36,6 +88,42 @@ def test_mesh_import_creates_mesh_object_as_child_only(qapp):
     assert mesh_object.visible is False
     assert mesh_object.comments == "test mesh"
     assert mesh_object.metadata["comments"] == "test mesh"
+    assert isinstance(mesh_object.mesh_block_object, MeshBlockObject)
+    assert mesh_object.mesh_block_object.mesh_data is mesh_object.mesh_data
+
+
+def test_mesh_import_block_is_a_factory():
+    import_task = MeshImportTask(
+        MeshImportModel(name="Imported Mesh", guid="mesh-guid")
+    )
+
+    assert not isinstance(import_task, MeshBlockObject)
+
+
+def test_tree_and_table_read_mesh_identity_from_block(qapp):
+    table_manager = TableManager()
+    table_model = TableModel(table_manager)
+    mesh_object = MeshImportModel(
+        name="Initial name",
+        guid="initial-guid",
+        mesh_data=object(),
+    ).to_mesh_object()
+    mesh_root.add_child(mesh_object.node)
+    mesh_object.add_to_table(table_manager)
+    tree_model = TreeModel(root_objects.get_nodes())
+
+    mesh_object.block_object.name = "Block name"
+    mesh_object.block_object.guid = "block-guid"
+
+    root_index = tree_model.index(root_objects.get_nodes().index(mesh_root), 0)
+    mesh_index = tree_model.index(0, 0, root_index)
+    assert tree_model.data(mesh_index, Qt.DisplayRole) == "Block name"
+    assert table_model.data(
+        table_model.index(0, table_model.NAME),
+        Qt.DisplayRole,
+    ) == "Block name"
+    assert mesh_object.name == "Block name"
+    assert mesh_object.guid == "block-guid"
 
 
 def test_object_base_registers_table_data(qapp):

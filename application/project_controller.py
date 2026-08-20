@@ -1,9 +1,12 @@
-from PySide6.QtWidgets import QHeaderView
+from pathlib import Path
+
+from PySide6.QtWidgets import QDialog, QFileDialog, QHeaderView
 
 from components.tree import TreeManager, TreeModel
 from components.tree.roots import root_objects
 from menu import setup_menu
 from application.importers import ObjectImporterModel
+from application.project_serializer import ProjectSerializer
 
 
 class ProjectController:
@@ -16,6 +19,8 @@ class ProjectController:
         self.table_model = window.tableView.table_model
         self.object_importer = None
         self.controllers = []
+        self.project_serializer = ProjectSerializer()
+        self.project_file = None
 
     def setup(self):
         """Connect the loaded widgets and initialize project features."""
@@ -23,12 +28,14 @@ class ProjectController:
         self.window.table_manager = self.table_manager
         self.window.tree_manager = self.tree_manager
         self.window.treeWidget.setHeaderHidden(True)
-        self.window.treeWidget.setModel(TreeModel(root_objects.get_nodes()))
+        self.tree_model = TreeModel(root_objects.get_nodes())
+        self.window.treeWidget.setModel(self.tree_model)
         self.window.tableView.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
         self.window.tableView.clicked.connect(self.table_model.handle_click)
         self.window.scene_viewer = self.window.centralWidget()
+        self.window.engine_runner = self.window.engineRunner
         self.object_importer = ObjectImporterModel(
             table_model=self.table_model,
             tree_manager=self.tree_manager,
@@ -39,7 +46,89 @@ class ProjectController:
             self.object_importer.bind_registered_features(
                 tree_view=self.window.treeWidget,
                 parent=self.window,
+                engine_runner=self.window.engine_runner,
             )
         )
         setup_menu(self.window)
+        self.window.save_action.triggered.connect(
+            lambda checked=False: self.save_project()
+        )
+        self.window.save_as_action.triggered.connect(
+            lambda checked=False: self.save_project_as()
+        )
+        self.window.open_action.triggered.connect(
+            lambda checked=False: self.open_project()
+        )
         return self.window
+
+    def save_project(self):
+        """Save the current project to its active project file."""
+        if self.project_file is None:
+            return self.save_project_as()
+        return self.project_serializer.save(
+            self.project_file,
+            self.table_model,
+            self.window.scene_viewer,
+        )
+
+    def save_project_as(self):
+        """Save the current project to a newly selected metadata file."""
+        dialog = QFileDialog(self.window, "Save Project As")
+        dialog.setOption(
+            QFileDialog.Option.DontUseNativeDialog,
+            True,
+        )
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+        dialog.setNameFilter(
+            "RainFall projects (project.json);;JSON files (*.json)"
+        )
+        default_directory = self.project_file.parent if self.project_file else Path.home()
+        default_name = self.project_file.name if self.project_file else "project.json"
+        dialog.setDirectory(str(default_directory))
+        dialog.selectFile(default_name)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        selected_files = dialog.selectedFiles()
+        project_file = selected_files[0] if selected_files else ""
+        if not project_file:
+            return None
+        saved_file = self.project_serializer.save(
+            project_file,
+            self.table_model,
+            self.window.scene_viewer,
+        )
+        self.project_file = saved_file
+        self._set_block_data_directory(saved_file)
+        return saved_file
+
+    def load_project(self, project_file):
+        """Load a project and make its file the active save target."""
+        self._set_block_data_directory(project_file)
+        loaded = self.project_serializer.load(
+            project_file,
+            self.object_importer,
+            self.tree_model,
+            self.table_model,
+            self.window.scene_viewer,
+        )
+        self.project_file = Path(project_file)
+        return loaded
+
+    def _set_block_data_directory(self, project_file):
+        self.object_importer.block_data_directory = (
+            Path(project_file).parent / "block_data"
+        )
+
+    def open_project(self):
+        """Load a project JSON file and rebuild its registered objects."""
+        from PySide6.QtWidgets import QFileDialog
+
+        project_file, _ = QFileDialog.getOpenFileName(
+            self.window,
+            "Open Project",
+            filter="RainFall projects (project.json);;JSON files (*.json)",
+        )
+        if not project_file:
+            return None
+        return self.load_project(project_file)

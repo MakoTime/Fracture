@@ -30,10 +30,10 @@ class ImportBindingRegistry:
         cls._discovered = True
 
     @classmethod
-    def bind_all(cls, object_importer, tree_view, parent=None):
+    def bind_all(cls, object_importer, tree_view, parent=None, engine_runner=None):
         cls.discover()
         return [
-            binder(object_importer, tree_view, parent)
+            binder(object_importer, tree_view, parent, engine_runner)
             for binder in cls._bindings
         ]
 
