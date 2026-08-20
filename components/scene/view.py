@@ -2,6 +2,7 @@ from typing import Any
 
 import numpy as np
 import pyvista as pv
+import vtk
 from pyvistaqt import QtInteractor
 from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import QVBoxLayout, QWidget
@@ -18,8 +19,10 @@ class SceneViewer(QWidget):
         self._actors = {}
         self.plotter = QtInteractor(self)
         self._pan_anchor = None
+        self._pan_active = False
         self._pan_render_pending = False
         self.plotter.interactor.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._configure_terrain_interaction()
         self.plotter.interactor.installEventFilter(self)
 
         layout = QVBoxLayout(self)
@@ -27,7 +30,13 @@ class SceneViewer(QWidget):
         layout.addWidget(self.plotter.interactor)
         self._restore_lighting()
         self.plotter.show_axes()
-        self._keep_z_vertical()
+
+    def _configure_terrain_interaction(self):
+        """Use VTK's terrain navigation for orbit, pan, and zoom."""
+        vtk.vtkObject.GlobalWarningDisplayOff()
+        self._terrain_style = vtk.vtkInteractorStyleTerrain()
+        self._terrain_style.SetDefaultRenderer(self.plotter.renderer)
+        self.plotter.interactor.SetInteractorStyle(self._terrain_style)
 
     def _restore_lighting(self):
         """Restore the default three-point lighting after renderer resets."""
@@ -37,11 +46,6 @@ class SceneViewer(QWidget):
         if watched is not self.plotter.interactor:
             return super().eventFilter(watched, event)
 
-        if event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Home:
-                self.reset_camera()
-                return True
-
         if event.type() == QEvent.Type.MouseMove:
             if event.buttons() == (
                 Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
@@ -50,57 +54,50 @@ class SceneViewer(QWidget):
                 return True
             self._pan_anchor = None
 
-        if event.type() in (
-            QEvent.Type.MouseButtonPress,
-            QEvent.Type.MouseButtonRelease,
-        ):
+        if event.type() == QEvent.Type.MouseButtonPress:
             if event.buttons() == (
                 Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
             ):
+                self._pan_active = True
                 self._pan_anchor = event.position().toPoint()
-            elif event.type() == QEvent.Type.MouseButtonRelease:
-                self._pan_anchor = None
+                self._end_terrain_gesture()
+                return True
 
-        if event.type() in (
-            QEvent.Type.MouseMove,
-            QEvent.Type.MouseButtonRelease,
-        ):
-            self._keep_z_vertical()
-            if event.type() == QEvent.Type.MouseButtonRelease:
-                self.plotter.render()
+        if event.type() == QEvent.Type.MouseButtonRelease and self._pan_active:
+            self._pan_active = False
+            self._pan_anchor = None
+            self._end_terrain_gesture()
+            self.plotter.render()
+            return True
+
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            self._end_terrain_gesture()
+            self.plotter.render()
         return super().eventFilter(watched, event)
+
+    def _end_terrain_gesture(self):
+        self._terrain_style.EndRotate()
+        self._terrain_style.EndPan()
 
     def reset_camera(self):
         """Fit all visible scene data in the render window."""
         self.plotter.reset_camera()
-        self._keep_z_vertical()
         self.plotter.render()
-
-    def _keep_z_vertical(self):
-        """Keep the world Z axis vertical while the camera moves."""
-        self.plotter.camera.SetViewUp(0.0, 0.0, 1.0)
 
     def _pan_camera(self, position):
         if self._pan_anchor is None:
             self._pan_anchor = position
             return
 
-        previous_world = self._display_to_focal_world(self._pan_anchor)
-        current_world = self._display_to_focal_world(position)
-        if previous_world is None or current_world is None:
-            self._pan_anchor = position
-            return
-
-        movement = previous_world - current_world
+        delta = position - self._pan_anchor
+        movement = self._display_delta_to_world(delta)
         camera = self.plotter.camera
         camera.SetPosition(camera.GetPosition() + movement)
         camera.SetFocalPoint(camera.GetFocalPoint() + movement)
         self._pan_anchor = position
-        self._keep_z_vertical()
         self._schedule_pan_render()
 
     def _schedule_pan_render(self):
-        """Coalesce expensive VTK renders while the camera is being dragged."""
         if self._pan_render_pending:
             return
         self._pan_render_pending = True
@@ -110,22 +107,34 @@ class SceneViewer(QWidget):
         self._pan_render_pending = False
         self.plotter.render()
 
-    def _display_to_focal_world(self, position):
-        renderer = self.plotter.renderer
+    def _display_delta_to_world(self, delta):
         camera = self.plotter.camera
-        renderer.SetWorldPoint(*camera.GetFocalPoint(), 1.0)
-        renderer.WorldToDisplay()
-        focal_display = renderer.GetDisplayPoint()
-        renderer.SetDisplayPoint(
-            position.x(),
-            self.plotter.interactor.height() - position.y(),
-            focal_display[2],
+        height = max(self.plotter.interactor.height(), 1)
+        direction = np.asarray(camera.GetFocalPoint()) - np.asarray(
+            camera.GetPosition()
         )
-        renderer.DisplayToWorld()
-        world = renderer.GetWorldPoint()
-        if world[3] == 0:
-            return None
-        return np.asarray(world[:3], dtype=float)
+        direction /= np.linalg.norm(direction)
+        view_up = np.asarray(camera.GetViewUp())
+        view_up /= np.linalg.norm(view_up)
+        right = np.cross(direction, view_up)
+        right /= np.linalg.norm(right)
+        screen_up = np.cross(right, direction)
+
+        if camera.GetParallelProjection():
+            world_height = 2.0 * camera.GetParallelScale()
+        else:
+            distance = np.linalg.norm(
+                np.asarray(camera.GetFocalPoint())
+                - np.asarray(camera.GetPosition())
+            )
+            world_height = 2.0 * distance * np.tan(
+                np.deg2rad(camera.GetViewAngle()) / 2.0
+            )
+
+        pixels_to_world = world_height / height
+        return pixels_to_world * (
+            -delta.x() * right + delta.y() * screen_up
+        )
 
     def add_object(self, object_base: Any):
         block_object = getattr(object_base, "block_object", None)

@@ -1,5 +1,5 @@
 PySide6
-numpy
+numpy<2.5
 pyvista==0.48.4
 pyvistaqt==0.12.0
 pytest
