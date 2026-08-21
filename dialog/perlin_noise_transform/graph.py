@@ -328,10 +328,16 @@ class FrequencyAmplitudeGraph(QWidget):
 
     def mouseReleaseEvent(self, event):
         del event
+        was_dragging = (
+            self._drag_index is not None
+            or self._handle_drag_index is not None
+        )
         self._drag_index = None
         self._handle_drag_index = None
         self._handle_drag_side = None
         self._handle_drag_origin_x = None
+        if was_dragging:
+            self.values_changed.emit()
 
     def _nearest_anchor_index(self, position):
         points = self._normalized_curve_points(self.curve_points)
@@ -424,7 +430,6 @@ class FrequencyAmplitudeGraph(QWidget):
             else (opposite, moved)
         )
         self.update()
-        self.values_changed.emit()
 
     def _update_drag(self, position):
         if self._drag_index is None:
@@ -464,7 +469,6 @@ class FrequencyAmplitudeGraph(QWidget):
         else:
             self.amplitudes[self._drag_index] = y
         self.update()
-        self.values_changed.emit()
 
     def sampled_values(self, count):
         if self.curve_mode == "line" and self.curve_points:

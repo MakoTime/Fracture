@@ -8,7 +8,12 @@ from .view import MeshEditView
 
 def create_mesh_edit_dialog(
     mesh_object,
+    colourmaps=(),
     parent: Optional[QWidget] = None,
 ) -> MeshEditView:
     """Build a dialog for editing an existing mesh."""
-    return MeshEditView(MeshEditModel.from_mesh_object(mesh_object), parent=parent)
+    return MeshEditView(
+        MeshEditModel.from_mesh_object(mesh_object),
+        colourmaps=colourmaps,
+        parent=parent,
+    )

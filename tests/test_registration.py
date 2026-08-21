@@ -1,12 +1,13 @@
 from types import SimpleNamespace
 
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEventLoop, QTimer, Qt
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtWidgets import QWidget
 
 from components.table import TableManager, TableModel
 from components.tree import TreeModel
-from components.tree.roots import mesh_root, root_objects, transform_root
+from components.tree.roots import colourmap_root, mesh_root, root_objects, transform_root
 from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_generate import GenerateMeshWindow, MeshGenerateModel
 from dialog.mesh_mask import SurfaceMaskModel
@@ -21,6 +22,7 @@ from objects.mesh_object import MeshObject
 from objects.generated_mesh import GeneratedMesh
 from application.importers import MeshImportController, ObjectImporterModel
 from application.importers import TransformController
+from application.importers import ColourmapController
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from objects.object_base import ObjectBase
@@ -84,6 +86,18 @@ def test_mesh_root_menu_separates_import_types(qapp):
     ]
 
 
+def test_mesh_menu_includes_colourmap_editor(qapp):
+    controller = MeshImportController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+    mesh = MeshObject("Terrain", auto_register_root=False)
+
+    menu = controller.create_context_menu(mesh.node)
+
+    assert "Edit Colourmap" in [action.text() for action in menu.actions()]
+
+
 def test_perlin_transform_menu_includes_edit_action(qapp):
     controller = TransformController(
         object_importer=SimpleNamespace(),
@@ -97,6 +111,17 @@ def test_perlin_transform_menu_includes_edit_action(qapp):
 
     assert [action.text() for action in menu.actions()] == ["Edit", "Delete"]
     transform.remove_from_tree()
+
+
+def test_colourmap_root_menu_includes_new_action(qapp):
+    controller = ColourmapController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+
+    menu = controller.create_context_menu(colourmap_root)
+
+    assert [action.text() for action in menu.actions()] == ["New Colourmap"]
 
 
 def test_perlin_transform_registration_enqueues_block_task(qapp):
@@ -120,16 +145,47 @@ def test_perlin_transform_registration_enqueues_block_task(qapp):
 
 
 def test_generate_mesh_opens_standalone_window(qapp):
+    class FakeSceneViewer(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.plotter = SimpleNamespace(
+                add_mesh=lambda *args, **kwargs: None,
+                render=lambda: None,
+            )
+
+        def clear_scene(self):
+            pass
+
+        def zoom_camera(self, factor):
+            pass
+
+    import dialog.mesh_generate.view as generate_view
+
+    original_viewer = generate_view.SceneViewer
+    generate_view.SceneViewer = FakeSceneViewer
     controller = MeshImportController(
         object_importer=SimpleNamespace(),
         tree_view=SimpleNamespace(),
     )
+    try:
+        window = controller.generate_mesh()
 
-    window = controller.generate_mesh()
+        wait_loop = QEventLoop()
+        poll = QTimer()
+        poll.timeout.connect(
+            lambda: wait_loop.quit() if window._preview_ready else None
+        )
+        poll.start(10)
+        QTimer.singleShot(2_000, wait_loop.quit)
+        wait_loop.exec()
+        poll.stop()
 
-    assert window.windowTitle() == "Generate Mesh"
-    assert window.isVisible() is True
-    window.close()
+        assert window.windowTitle() == "Generate Mesh"
+        assert window._preview_ready is True
+        assert window.isVisible() is True
+        window.close()
+    finally:
+        generate_view.SceneViewer = original_viewer
 
 
 def test_generate_mesh_flexible_checkbox_controls_grid_size_editing(qapp):
@@ -538,6 +594,7 @@ def test_mesh_object_menu_includes_edit_action(qapp):
     menu = controller.create_context_menu(mesh_object.node)
 
     assert [action.text() for action in menu.actions()] == [
+        "Edit Colourmap",
         "Edit Mesh",
         "Show in scene",
         "Delete",
@@ -559,6 +616,7 @@ def test_generated_mesh_menu_includes_edit_generation_action(qapp):
 
     assert [action.text() for action in menu.actions()] == [
         "Edit Generation",
+        "Edit Colourmap",
         "Edit Mesh",
         "Show in scene",
         "Delete",

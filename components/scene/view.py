@@ -14,10 +14,11 @@ from .sky_dome import SkyDome
 class SceneViewer(QWidget):
     """Qt widget that displays SceneModel objects with PyVista."""
 
-    def __init__(self, parent=None, scene_model=None):
+    def __init__(self, parent=None, scene_model=None, show_sky_dome=True):
         super().__init__(parent)
         self.scene_model = scene_model or SceneModel()
         self._actors = {}
+        self._show_sky_dome = show_sky_dome
         self.sky_dome = SkyDome()
         self.plotter = QtInteractor(self)
         self._pan_anchor = None
@@ -31,7 +32,8 @@ class SceneViewer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.plotter.interactor)
         self.plotter.set_background("#465568")
-        self.sky_dome.add_to(self.plotter)
+        if self._show_sky_dome:
+            self.sky_dome.add_to(self.plotter)
         self._restore_lighting()
         self.plotter.show_axes()
 
@@ -49,6 +51,10 @@ class SceneViewer(QWidget):
     def eventFilter(self, watched, event):
         if watched is not self.plotter.interactor:
             return super().eventFilter(watched, event)
+
+        if event.type() == QEvent.Type.Wheel:
+            self._zoom_camera_from_wheel(event.angleDelta().y())
+            return True
 
         if event.type() == QEvent.Type.MouseMove:
             if event.buttons() == (
@@ -90,6 +96,29 @@ class SceneViewer(QWidget):
             0.01, self.sky_dome.radius * 2.0
         )
         self.plotter.render()
+
+    def zoom_camera(self, factor):
+        """Zoom the current camera, where values below one zoom out."""
+        factor = float(factor)
+        if factor <= 0:
+            raise ValueError("zoom factor must be positive")
+        camera = self.plotter.camera
+        if camera.GetParallelProjection():
+            camera.SetParallelScale(camera.GetParallelScale() / factor)
+        else:
+            position = np.asarray(camera.GetPosition(), dtype=float)
+            focal_point = np.asarray(camera.GetFocalPoint(), dtype=float)
+            camera.SetPosition(
+                tuple(focal_point + (position - focal_point) / factor)
+            )
+        self.plotter.render()
+
+    def _zoom_camera_from_wheel(self, delta):
+        if not delta:
+            return
+        # One wheel step is 120 units. Smaller factors zoom out, larger zoom in.
+        steps = delta / 120.0
+        self.zoom_camera(1.15 ** steps)
 
     def _pan_camera(self, position):
         if self._pan_anchor is None:
@@ -150,6 +179,7 @@ class SceneViewer(QWidget):
             raise ValueError("ObjectBase.scene_data must contain PyVista data")
 
         if isinstance(payload, pv.StructuredGrid):
+            payload = payload.copy(deep=True)
             payload = payload.extract_surface(
                 algorithm="dataset_surface",
             ).compute_normals(
@@ -160,6 +190,53 @@ class SceneViewer(QWidget):
             if block_object is not None:
                 block_object.mesh_data = payload
 
+        if hasattr(payload, "compute_normals") and "Normals" not in payload.point_data:
+            payload = payload.compute_normals(
+                auto_orient_normals=True,
+                split_vertices=False,
+                inplace=False,
+            )
+            if block_object is not None:
+                block_object.mesh_data = payload
+
+        colour_scalars = None
+        colourmap = getattr(block_object, "colourmap", None)
+        if hasattr(payload, "point_data") and "__colourmap_rgba" in payload.point_data:
+            del payload.point_data["__colourmap_rgba"]
+        if colourmap is not None and hasattr(payload, "points"):
+            points = np.asarray(payload.points)
+            elevation = points[:, 2]
+            elevation_span = float(elevation.max() - elevation.min()) if len(elevation) else 0.0
+            relative_elevation = (
+                np.zeros_like(elevation)
+                if elevation_span <= 1e-12
+                else (elevation - elevation.min()) / elevation_span
+            )
+            normals = np.asarray(payload.point_data.get("Normals", np.zeros_like(points)))
+            normal_z = np.clip((1.0 - normals[:, 2]) * 0.5, 0.0, 1.0)
+            field_sources = getattr(
+                block_object, "colourmap_field_sources", ("elevation", "normal_z")
+            )
+            field_values = {
+                "elevation": relative_elevation,
+                "normal_z": normal_z,
+            }
+            first_field = field_values.get(field_sources[0], relative_elevation)
+            second_field = field_values.get(field_sources[1], normal_z)
+            inversions = getattr(
+                block_object, "colourmap_field_inversions", (False, False)
+            )
+            if inversions[0]:
+                first_field = 1.0 - first_field
+            if inversions[1]:
+                second_field = 1.0 - second_field
+            colour_scalars = np.clip(
+                np.round(colourmap.apply_fields(first_field, second_field) * 255.0),
+                0,
+                255,
+            ).astype(np.uint8)
+            payload.point_data["__colourmap_rgba"] = colour_scalars
+
         name = getattr(object_base, "name", None)
         if hasattr(payload, "GetMapper"):
             actor = self.plotter.add_actor(payload, reset_camera=False)
@@ -167,6 +244,8 @@ class SceneViewer(QWidget):
             actor = self.plotter.add_mesh(
                 payload,
                 name=name,
+                scalars="__colourmap_rgba" if colour_scalars is not None else None,
+                rgb=colour_scalars is not None,
                 reset_camera=False,
             )
 
@@ -175,6 +254,18 @@ class SceneViewer(QWidget):
         self.scene_model.add_object(object_base)
         self.reset_camera()
         return actor
+
+    def refresh_object_colourmap(self, object_base):
+        """Rebuild an object's actor after its optional colourmap changes."""
+        if object_base not in self._actors:
+            return False
+        camera_position = self.plotter.camera_position
+        actor = self._actors.pop(object_base)
+        self.plotter.remove_actor(actor)
+        self.add_object(object_base)
+        self.plotter.camera_position = camera_position
+        self.plotter.render()
+        return True
 
     def remove_object(self, object_base: Any):
         actor = self._actors.pop(object_base, None)
@@ -195,8 +286,9 @@ class SceneViewer(QWidget):
 
     def clear_scene(self):
         self.plotter.clear()
-        self.sky_dome.remove()
-        self.sky_dome.add_to(self.plotter)
+        if self._show_sky_dome:
+            self.sky_dome.remove()
+            self.sky_dome.add_to(self.plotter)
         self._restore_lighting()
         self._actors.clear()
         self.scene_model.clear()

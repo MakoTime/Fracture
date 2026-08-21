@@ -4,11 +4,13 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QLineEdit,
+    QPushButton,
     QTextEdit,
     QVBoxLayout,
 )
 
 from tools.widgets.vector import Vector3Widget
+from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
 
 from .model import MeshEditModel
 
@@ -16,23 +18,27 @@ from .model import MeshEditModel
 class MeshEditView(QDialog):
     """Dialog for editing metadata and transforms on an existing mesh."""
 
-    def __init__(self, model: MeshEditModel, parent=None):
+    def __init__(self, model: MeshEditModel, colourmaps=(), parent=None):
         super().__init__(parent)
         self.model = model
         self.setWindowTitle("Edit Mesh")
         self.resize(520, 420)
         self._build_ui()
+        self._colourmaps = tuple(colourmaps)
         self.set_model(model)
 
     def _build_ui(self):
         self.name = QLineEdit()
         self.comments = QTextEdit()
+        self.colourmap = QPushButton("Configure Colourmap...")
+        self.colourmap.clicked.connect(self._configure_colourmap)
         self.comments.setPlaceholderText("Optional notes about this mesh")
         self.comments.setMinimumHeight(72)
 
         metadata = QFormLayout()
         metadata.addRow("Name", self.name)
         metadata.addRow("Comments", self.comments)
+        metadata.addRow("Colourmap", self.colourmap)
 
         self.scale = Vector3Widget()
         self.rotation = Vector3Widget()
@@ -66,6 +72,7 @@ class MeshEditView(QDialog):
         self.model = model
         self.name.setText(model.name)
         self.comments.setPlainText(model.comments)
+        self._update_colourmap_label()
         self.scale.set_value(model.scale)
         self.rotation.set_value(model.rotation)
         self.offset.set_value(model.offset)
@@ -77,6 +84,44 @@ class MeshEditView(QDialog):
         self.model.rotation = self.rotation.value()
         self.model.offset = self.offset.value()
         return self.model
+
+    def _configure_colourmap(self):
+        field1, field2 = self.model.colourmap_field_sources
+        invert1, invert2 = self.model.colourmap_field_inversions
+        selected = next(
+            (
+                colourmap
+                for colourmap in self._colourmaps
+                if getattr(colourmap, "block_object", colourmap)
+                is self.model.colourmap
+            ),
+            None,
+        )
+        dialog = create_mesh_colourmap_dialog(
+            MeshColourmapModel(
+                mesh_object=self.model.mesh_object,
+                colourmap=selected,
+                field1_source=field1,
+                field2_source=field2,
+                invert_field1=invert1,
+                invert_field2=invert2,
+            ),
+            colourmaps=self._colourmaps,
+            parent=self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        configured = dialog.update_model()
+        self.model.colourmap = configured.colourmap
+        self.model.colourmap_field_sources = (
+            configured.field1_source,
+            configured.field2_source,
+        )
+        self._update_colourmap_label()
+
+    def _update_colourmap_label(self):
+        name = getattr(self.model.colourmap, "name", "None")
+        self.colourmap.setText(f"Colourmap: {name}")
 
     def _accept(self):
         self.update_model()

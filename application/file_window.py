@@ -258,10 +258,14 @@ class FileWindow:
         self.window.projectPreview.clear_scene()
         self._preview_meshes = []
         for item in objects:
+            if item.get("type") not in ("mesh", "generated_mesh"):
+                continue
             if not item.get("in_scene", True):
                 continue
             block_path = project_path.parent / item.get("block_data", "")
             if not block_path.is_file():
+                continue
+            if block_path.name.endswith(".colourmap.json"):
                 continue
             block = MeshBlockObject.load(
                 block_path,

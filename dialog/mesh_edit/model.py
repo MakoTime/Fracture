@@ -16,6 +16,9 @@ class MeshEditModel:
     scale: Vector3
     rotation: Vector3
     offset: Vector3
+    colourmap: object | None = None
+    colourmap_field_sources: tuple[str, str] = ("elevation", "normal_z")
+    colourmap_field_inversions: tuple[bool, bool] = (False, False)
 
     @classmethod
     def from_mesh_object(cls, mesh_object: MeshObject):
@@ -23,6 +26,9 @@ class MeshEditModel:
             mesh_object=mesh_object,
             name=mesh_object.name,
             comments=mesh_object.comments,
+            colourmap=mesh_object.colourmap,
+            colourmap_field_sources=mesh_object.colourmap_field_sources,
+            colourmap_field_inversions=mesh_object.colourmap_field_inversions,
             scale=mesh_object.scale,
             rotation=mesh_object.rotation,
             offset=mesh_object.offset,
@@ -35,6 +41,11 @@ class MeshEditModel:
         self.mesh_object.scale = self.scale
         self.mesh_object.rotation = self.rotation
         self.mesh_object.offset = self.offset
+        self.mesh_object.set_colourmap(self.colourmap)
+        self.mesh_object.set_colourmap_field_sources(*self.colourmap_field_sources)
+        self.mesh_object.set_colourmap_data_options(
+            *self.colourmap_field_inversions,
+        )
         self.mesh_object.metadata.update(
             {
                 "comments": self.mesh_object.comments,

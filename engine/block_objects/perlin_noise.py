@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+import json
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -65,6 +67,42 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             )
             result += (noise - 0.5) * amplitude
         return result
+
+    def serialise(self, path):
+        output = Path(path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            json.dumps(
+                {
+                    "name": self.name,
+                    "guid": self.guid,
+                    "comments": self.comments,
+                    "frequencies": list(self.frequencies),
+                    "amplitudes": list(self.amplitudes),
+                    "seed": self.seed,
+                    "curve_mode": self.curve_mode,
+                    "curve_points": [list(point) for point in self.curve_points],
+                    "curve_handles": [
+                        None if handles is None else [list(point) for point in handles]
+                        for handles in self.curve_handles
+                    ],
+                    "frequency_start": self.frequency_start,
+                    "frequency_end": self.frequency_end,
+                    "sample_count": self.sample_count,
+                    "manual_sampling": self.manual_sampling,
+                    "preset": self.preset,
+                    "preset_options": self.preset_options,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        return output
+
+    save = serialise
+
+    def serialise_to_directory(self, directory):
+        return self.serialise(Path(directory) / f"{self.guid}.perlin_noise_transform.json")
 
     def noise_field(self, dimensions):
         """Build a normalized field from this transform's frequency bands."""

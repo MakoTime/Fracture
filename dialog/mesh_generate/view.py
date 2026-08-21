@@ -1,4 +1,4 @@
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QTimer, QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QDialog,
@@ -142,7 +142,12 @@ class GenerateMeshWindow(QMainWindow):
         self._on_apply = on_apply
         self.tree_search = tree_search
         self._applied_mesh = None
-        self.preview = SceneViewer(self)
+        self._preview_host = QWidget(self)
+        self._preview_host.setObjectName("meshPreviewHost")
+        self.preview = None
+        self._preview_ready = False
+        self._preview_layout = QVBoxLayout(self._preview_host)
+        self._preview_layout.setContentsMargins(0, 0, 0, 0)
         self.name_field = QLineEdit()
         self.name_field.setPlaceholderText("Generated Mesh")
         self.name_field.setText(self.model.name)
@@ -270,7 +275,7 @@ class GenerateMeshWindow(QMainWindow):
 
         top = QSplitter(Qt.Orientation.Horizontal)
         top.addWidget(left_panel)
-        top.addWidget(self.preview)
+        top.addWidget(self._preview_host)
         top.setChildrenCollapsible(False)
         top.setStretchFactor(0, 0)
         top.setStretchFactor(1, 1)
@@ -283,8 +288,23 @@ class GenerateMeshWindow(QMainWindow):
         layout.addWidget(self.button_box)
         self.setCentralWidget(content)
         self._reset_camera = False
+        QTimer.singleShot(0, self._initialize_preview)
+
+    def _initialize_preview(self):
+        """Construct the native VTK widget after the window enters the event loop."""
+        if self._preview_ready:
+            return
+        self.preview = SceneViewer(self)
+        self.preview.setObjectName("meshPreview")
+        self._preview_layout.addWidget(self.preview)
+        self._preview_ready = True
         with self.change_camera():
             self._update_preview()
+        QTimer.singleShot(0, self._zoom_initial_preview)
+
+    def _zoom_initial_preview(self):
+        """Zoom after the initial generated grid has been fitted."""
+        self.preview.zoom_camera(0.65)
         
     @contextmanager
     def change_camera(self):
@@ -420,6 +440,8 @@ class GenerateMeshWindow(QMainWindow):
         )
 
     def _update_preview(self):
+        if not self._preview_ready:
+            return
         self.model.grid_size = self.grid_size.value()
         self.model.show_grid = self.grid_visibility.is_visible()
         self.model.show_mask_surface = self.show_mask_surface.is_visible()

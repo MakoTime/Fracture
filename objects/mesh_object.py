@@ -109,3 +109,30 @@ class MeshObject(ObjectBase):
     def block_object(self) -> MeshBlockObject:
         """Backward-compatible alias for the mesh block object."""
         return self.mesh_block_object
+
+    @property
+    def colourmap(self):
+        return self.mesh_block_object.colourmap
+
+    def set_colourmap(self, colourmap):
+        return self.mesh_block_object.set_colourmap(
+            getattr(colourmap, "block_object", colourmap)
+        )
+
+    @property
+    def colourmap_field_sources(self):
+        return self.mesh_block_object.colourmap_field_sources
+
+    def set_colourmap_field_sources(self, field1_source, field2_source):
+        return self.mesh_block_object.set_colourmap_field_sources(
+            field1_source, field2_source
+        )
+
+    @property
+    def colourmap_field_inversions(self):
+        return self.mesh_block_object.colourmap_field_inversions
+
+    def set_colourmap_data_options(self, invert_field1, invert_field2):
+        return self.mesh_block_object.set_colourmap_data_options(
+            invert_field1, invert_field2
+        )

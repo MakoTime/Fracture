@@ -6,6 +6,7 @@ from components.tree import TreeModel, TreeSearch
 from components.tree.roots import root_objects
 from components.tree.roots import mesh_root
 from dialog.mesh_edit.factory import create_mesh_edit_dialog
+from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
 from dialog.mesh_generate import GenerateMeshWindow
 from dialog.mesh_generate import MeshGenerateModel
 from dialog.mesh_import.factory import (
@@ -15,6 +16,7 @@ from dialog.mesh_import.factory import (
 from dialog.notify import create_notification
 from engine import EngineTask
 from engine.block_objects import MeshBlockObject
+from objects.colourmap import ColourmapObject
 from engine.block_tasks import GeneratedMeshTask, MeshImportTask
 from engine.block_tasks import PerlinNoiseTransformTask
 from objects.mesh_object import MeshObject
@@ -129,8 +131,10 @@ class MeshImportController:
 
     def _replace_generated_mesh(self, mesh_object, edited_mesh):
         was_visible = mesh_object.visible
+        colourmap = mesh_object.colourmap
         mesh_object.remove_from_scene()
         mesh_object.mesh_block_object = edited_mesh.mesh_block_object
+        mesh_object.mesh_block_object.set_colourmap(colourmap)
         mesh_object.name = edited_mesh.name
         mesh_object.metadata.update(edited_mesh.metadata)
         self.object_importer.persist_block(mesh_object.mesh_block_object)
@@ -159,6 +163,9 @@ class MeshImportController:
         return mesh_object
 
     def _sync_generated_mesh_children(self, mesh_object):
+        return self._sync_mesh_children(mesh_object)
+
+    def _sync_mesh_children(self, mesh_object):
         block_children = mesh_object.mesh_block_object.child_block_objects
         transforms = TreeSearch(root_objects.get_nodes()).find(
             lambda node: node.block_object in block_children
@@ -187,15 +194,67 @@ class MeshImportController:
 
     def edit_mesh(self, mesh_object: MeshObject):
         """Edit an existing mesh after the dialog is accepted."""
-        dialog = create_mesh_edit_dialog(mesh_object, parent=self.parent)
+        colourmaps = TreeSearch(root_objects.get_nodes()).find(
+            lambda node: isinstance(node.node_object, ColourmapObject)
+        )
+        dialog = create_mesh_edit_dialog(
+            mesh_object,
+            colourmaps=tuple(colourmaps),
+            parent=self.parent,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
         edited_model = dialog.update_model()
         edited_mesh = edited_model.apply()
+        self._sync_mesh_children(edited_mesh)
         self.object_importer.persist_block(edited_mesh.mesh_block_object)
+        scene = getattr(self.object_importer, "scene_viewer", None)
+        if scene is not None and hasattr(scene, "refresh_object_colourmap"):
+            scene.refresh_object_colourmap(edited_mesh)
         self.tree_view.model().refresh()
         return edited_mesh
+
+    def edit_mesh_colourmap(self, mesh_object: MeshObject):
+        """Configure the colourmap and source fields assigned to a mesh."""
+        colourmaps = TreeSearch(root_objects.get_nodes()).find(
+            lambda node: isinstance(node.node_object, ColourmapObject)
+        )
+        field1, field2 = mesh_object.colourmap_field_sources
+        invert1, invert2 = mesh_object.colourmap_field_inversions
+        selected = next(
+            (
+                colourmap
+                for colourmap in colourmaps
+                if getattr(colourmap, "block_object", colourmap)
+                is mesh_object.colourmap
+            ),
+            None,
+        )
+        dialog = create_mesh_colourmap_dialog(
+            MeshColourmapModel(
+                mesh_object=mesh_object,
+                colourmap=selected,
+                field1_source=field1,
+                field2_source=field2,
+                invert_field1=invert1,
+                invert_field2=invert2,
+            ),
+            colourmaps=tuple(colourmaps),
+            parent=self.parent,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        dialog.update_model().apply(mesh_object)
+        self._sync_mesh_children(mesh_object)
+        self.object_importer.persist_block(mesh_object.mesh_block_object)
+        scene = getattr(self.object_importer, "scene_viewer", None)
+        if scene is not None and hasattr(scene, "refresh_object_colourmap"):
+            scene.refresh_object_colourmap(mesh_object)
+        tree_model = self.tree_view.model()
+        if isinstance(tree_model, TreeModel):
+            tree_model.refresh()
+        return mesh_object
 
     def _queue_import(self, model) -> Optional[EngineTask]:
         """Queue a mesh model and register it after engine processing."""
@@ -252,6 +311,12 @@ class MeshImportController:
                         lambda: self.edit_generation(node.node_object),
                     )
                 )
+            options.append(
+                (
+                    "Edit Colourmap",
+                    lambda: self.edit_mesh_colourmap(node.node_object),
+                )
+            )
             options.append(("Edit Mesh", lambda: self.edit_mesh(node.node_object)))
             options.append(("Show in scene", lambda: self.show_mesh(node.node_object)))
             options.append(("Delete", lambda: self.delete_mesh(node.node_object)))

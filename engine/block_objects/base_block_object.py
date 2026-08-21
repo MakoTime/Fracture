@@ -140,3 +140,10 @@ class BlockObject(ABC):
         Serialise any serialisable objects owned by the block object after the result is processed.
         """
         pass
+    
+    @abstractmethod
+    def serialise_to_directory(self, directory):
+        """
+        Serialise any serialisable objects owned by the block object after the result is processed.
+        """
+        pass

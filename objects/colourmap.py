@@ -46,6 +46,14 @@ class ColourmapObject(ObjectBase):
     def stops(self):
         return self.colourmap_block_object.stops
 
+    @property
+    def field1_name(self):
+        return self.colourmap_block_object.field1_name
+
+    @property
+    def field2_name(self):
+        return self.colourmap_block_object.field2_name
+
     def apply(self, values):
         return self.colourmap_block_object.apply(values)
 

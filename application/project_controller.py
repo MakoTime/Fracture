@@ -12,6 +12,7 @@ from components.tree.roots import root_objects
 from menu import setup_menu
 from application.importers import ObjectImporterModel
 from application.importers.transform_controller import TransformController
+from application.importers.colourmap_controller import ColourmapController
 from application.project_serializer import ProjectSerializer
 
 
@@ -62,6 +63,14 @@ class ProjectController:
         )
         self.controllers.append(
             TransformController(
+                object_importer=self.object_importer,
+                tree_view=self.window.treeWidget,
+                parent=self.window,
+                engine_runner=self.window.engineRunner,
+            )
+        )
+        self.controllers.append(
+            ColourmapController(
                 object_importer=self.object_importer,
                 tree_view=self.window.treeWidget,
                 parent=self.window,

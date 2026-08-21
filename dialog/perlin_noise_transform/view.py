@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .graph import FrequencyAmplitudeGraph
+from tools.widgets import BezierCurveGraph
 from .model import PerlinNoiseTransformModel
 from tools.widgets import DynamicSpinbox
 
@@ -82,7 +82,7 @@ class PerlinNoiseTransformView(QDialog):
         self._build_preset_options()
         self.preset_field.currentTextChanged.connect(self._build_preset_options)
 
-        self.graph = FrequencyAmplitudeGraph(
+        self.graph = BezierCurveGraph(
             self.model.frequencies,
             self.model.amplitudes,
             self.model.curve_points,

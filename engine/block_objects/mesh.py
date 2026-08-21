@@ -7,6 +7,7 @@ from uuid import uuid4
 import pyvista as pv
 
 from .base_block_object import BlockObject
+from .colourmap import ColourmapBlockObject
 
 
 @dataclass
@@ -18,11 +19,39 @@ class MeshBlockObject(BlockObject):
     guid: str = field(default_factory=lambda: str(uuid4()))
     comments: str = ""
     serialised_path: Path | None = field(default=None, repr=False, compare=False)
+    colourmap: ColourmapBlockObject | None = field(default=None, repr=False, compare=False)
+    colourmap_field_sources: tuple[str, str] = field(
+        default=("elevation", "normal_z"), repr=False
+    )
+    colourmap_field_inversions: tuple[bool, bool] = field(
+        default=(False, False), repr=False
+    )
 
     __hash__ = BlockObject.__hash__
 
     def __post_init__(self):
         BlockObject.__init__(self, self.name, self.guid, self.comments)
+        if self.colourmap is not None:
+            self.set_colourmap(self.colourmap)
+
+    def set_colourmap(self, colourmap):
+        if colourmap is not None and not isinstance(colourmap, ColourmapBlockObject):
+            raise TypeError("colourmap must be a ColourmapBlockObject")
+        if self.colourmap is not None:
+            self.remove_child_block_object(self.colourmap)
+        self.colourmap = colourmap
+        if colourmap is not None:
+            self.add_child_block_object(colourmap, dependent=False)
+        return colourmap
+
+    def set_colourmap_field_sources(self, field1_source, field2_source):
+        self.colourmap_field_sources = (str(field1_source), str(field2_source))
+
+    def set_colourmap_data_options(self, invert_field1, invert_field2):
+        self.colourmap_field_inversions = (
+            bool(invert_field1),
+            bool(invert_field2),
+        )
 
     BITMAP_EXTENSIONS = {".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 

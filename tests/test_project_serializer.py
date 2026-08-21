@@ -9,12 +9,19 @@ from application.project_serializer import ProjectSerializer
 from application.project_version import upgrade_project_data
 from components.table import TableManager, TableModel
 from components.tree import TreeManager, TreeModel
-from components.tree.roots import mesh_root, root_objects, transform_root
+from components.tree.roots import (
+    colourmap_root,
+    mesh_root,
+    root_objects,
+    transform_root,
+)
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from dialog.mesh_import.model import MeshImportModel
 from objects.generated_mesh import GeneratedMesh
 from engine.block_objects import GeneratedMeshBlockObject, MeshBlockObject
 from engine.block_objects import PerlinNoiseTransformBlockObject
+from engine.block_objects import ColourmapBlockObject
+from objects.colourmap import ColourmapObject
 from objects.mesh_object import MeshObject
 
 
@@ -247,6 +254,44 @@ def test_project_round_trip_restores_block_child_references(tmp_path):
     assert restored.block_object.perlin_noise_transform is restored_transform.block_object
     assert restored.block_object.child_block_objects == (restored_transform.block_object,)
     assert restored.block_object._child_dependencies[restored_transform.block_object]
+
+
+def test_project_round_trip_restores_colourmap_noise_transform(tmp_path):
+    table_model = TableModel(TableManager())
+    tree_manager = TreeManager()
+    tree_manager.root_nodes = root_objects.get_nodes()
+    scene = FakeScene()
+    importer = ObjectImporterModel(table_model, tree_manager, scene)
+    transform = PerlinNoiseTransformModel(name="Colour noise").to_object()
+    colourmap = ColourmapObject(
+        name="Terrain palette",
+        block_object=ColourmapBlockObject(
+            perlin_noise_transform=transform.block_object,
+            noise_enabled=True,
+        ),
+    )
+    importer.register(transform, parent=transform_root, add_to_scene=False)
+    importer.register(colourmap, parent=colourmap_root, add_to_scene=False)
+
+    project_file = ProjectSerializer().save(tmp_path, table_model, scene)
+    ProjectSerializer().load(
+        project_file,
+        importer,
+        TreeModel(root_objects.get_nodes()),
+        table_model,
+        scene,
+    )
+
+    restored = colourmap_root.children[0].node_object
+    restored_transform = transform_root.children[0].node_object
+    assert isinstance(restored, ColourmapObject)
+    assert restored.block_object.noise_enabled is True
+    assert (
+        restored.block_object.perlin_noise_transform
+        is restored_transform.block_object
+    )
+    assert restored_transform.block_object in restored.block_object.child_block_objects
+    assert restored.block_object._child_dependencies[restored_transform.block_object] is False
 
 
 def test_processed_block_can_be_persisted_and_released(tmp_path):

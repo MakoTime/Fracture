@@ -4,6 +4,7 @@ from .object_importer import ObjectImporterModel
 __all__ = [
     "ImportBindingRegistry",
     "MeshImportController",
+    "ColourmapController",
     "ObjectImporterModel",
     "TransformController",
     "register_import_binding",
@@ -11,6 +12,10 @@ __all__ = [
 
 
 def __getattr__(name):
+    if name == "ColourmapController":
+        from .colourmap_controller import ColourmapController
+
+        return ColourmapController
     if name == "MeshImportController":
         from .mesh_controller import MeshImportController
 

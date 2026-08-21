@@ -9,11 +9,13 @@ from components.tree.roots import (
 )
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from engine.block_objects import (
+    ColourmapBlockObject,
     GeneratedMeshBlockObject,
     MeshBlockObject,
     PerlinNoiseTransformBlockObject,
 )
 from objects.generated_mesh import GeneratedMesh
+from objects.colourmap import ColourmapObject
 from objects.mesh_object import MeshObject
 from application.project_version import CURRENT_PROJECT_VERSION, upgrade_project_data
 
@@ -57,6 +59,8 @@ class ProjectSerializer:
                 "in_scene": in_scene,
                 "parent_guid": self._parent_guid(node),
                 "child_references": self._child_references(block),
+                "colourmap_field_sources": list(block.colourmap_field_sources),
+                "colourmap_field_inversions": list(block.colourmap_field_inversions),
                 "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
             }
             if isinstance(mesh_object, GeneratedMesh):
@@ -91,6 +95,30 @@ class ProjectSerializer:
             )
             objects.append(item)
 
+        for node in self._walk_nodes(colourmap_root):
+            colourmap = node.node_object
+            if not isinstance(colourmap, ColourmapObject):
+                raise TypeError(
+                    f"Unsupported project object: {type(colourmap).__name__}"
+                )
+            block_path = colourmap.block_object.serialise(
+                block_directory / f"{colourmap.guid}.colourmap.json"
+            )
+            objects.append(
+                {
+                    "type": "colourmap",
+                    "guid": colourmap.guid,
+                    "name": colourmap.name,
+                    "comments": colourmap.block_object.comments,
+                    "visible": colourmap.visible,
+                    "parent_guid": self._parent_guid(node),
+                    "child_references": self._child_references(
+                        colourmap.block_object
+                    ),
+                    "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
+                }
+            )
+
         data = {"version": CURRENT_PROJECT_VERSION, "objects": objects}
         directory.mkdir(parents=True, exist_ok=True)
         project_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -109,7 +137,14 @@ class ProjectSerializer:
             remaining = []
             for item in pending:
                 is_transform = item.get("type") == "perlin_noise_transform"
-                default_parent = transform_root if is_transform else mesh_root
+                is_colourmap = item.get("type") == "colourmap"
+                default_parent = (
+                    transform_root
+                    if is_transform
+                    else colourmap_root
+                    if is_colourmap
+                    else mesh_root
+                )
                 parent = (
                     default_parent
                     if item.get("parent_guid") is None
@@ -127,6 +162,25 @@ class ProjectSerializer:
                         add_to_scene=False,
                     )
                     loaded[transform.guid] = transform
+                    continue
+                if is_colourmap:
+                    block = ColourmapBlockObject.load(
+                        project_path.parent / item["block_data"]
+                    )
+                    colourmap = ColourmapObject(
+                        name=item["name"],
+                        block_object=block,
+                        comments=item.get("comments", ""),
+                        visible=item.get("visible", True),
+                        guid=item["guid"],
+                        auto_register_root=False,
+                    )
+                    object_importer.register(
+                        colourmap,
+                        parent=parent,
+                        add_to_scene=False,
+                    )
+                    loaded[colourmap.guid] = colourmap
                     continue
                 block_path = project_path.parent / item["block_data"]
                 block_class = (
@@ -171,6 +225,17 @@ class ProjectSerializer:
                 mesh_object = object_class(
                     **object_kwargs,
                 )
+                sources = item.get(
+                    "colourmap_field_sources", block.colourmap_field_sources
+                )
+                if len(sources) == 2:
+                    block.set_colourmap_field_sources(*sources)
+                inversions = item.get(
+                    "colourmap_field_inversions",
+                    block.colourmap_field_inversions,
+                )
+                if len(inversions) == 2:
+                    block.set_colourmap_data_options(*inversions)
                 object_importer.register(
                     mesh_object,
                     parent=parent,
@@ -184,6 +249,7 @@ class ProjectSerializer:
             pending = remaining
 
         self._restore_block_relationships(data.get("objects", []), loaded)
+        self._restore_mesh_child_nodes(loaded)
         tree_model.refresh()
         return list(loaded.values())
 
@@ -234,11 +300,34 @@ class ProjectSerializer:
                     and isinstance(child_block, PerlinNoiseTransformBlockObject)
                 ):
                     parent_block.set_perlin_noise_transform(child_block)
+                elif (
+                    isinstance(parent_block, ColourmapBlockObject)
+                    and isinstance(child_block, PerlinNoiseTransformBlockObject)
+                ):
+                    parent_block.set_perlin_noise_transform(child_block)
+                elif isinstance(parent_block, MeshBlockObject) and isinstance(
+                    child_block, ColourmapBlockObject
+                ):
+                    parent_block.set_colourmap(child_block)
                 else:
                     parent_block.add_child_block_object(
                         child_block,
                         dependent=bool(reference.get("dependent", False)),
                     )
+
+    @staticmethod
+    def _restore_mesh_child_nodes(loaded):
+        objects = tuple(loaded.values())
+        for mesh_object in objects:
+            if not isinstance(mesh_object, MeshObject):
+                continue
+            child_blocks = mesh_object.mesh_block_object.child_block_objects
+            children = tuple(
+                object_base
+                for object_base in objects
+                if getattr(object_base, "block_object", None) in child_blocks
+            )
+            mesh_object.node.set_block_child_objects(children)
 
     @staticmethod
     def _clear_current_project(table_model, scene_viewer):
@@ -248,4 +337,5 @@ class ProjectSerializer:
         table_model.endResetModel()
         mesh_root.children.clear()
         transform_root.children.clear()
+        colourmap_root.children.clear()
         root_objects.nodes[:] = [mesh_root, transform_root, colourmap_root]
