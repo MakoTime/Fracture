@@ -12,8 +12,7 @@ class DummyBlockObject(BlockObject):
     def prepare(self):
         return self
 
-    def process(self, progress_callback=None):
-        self.prepare()
+    def process(self, prepared, progress_callback=None):
         self.validate()
         return self
 
@@ -31,11 +30,14 @@ class DummyBlockTask:
         self.label = label
         self.order = order
 
-    def process(self):
+    def prepare(self):
+        return self.block_object.prepare()
+
+    def process(self, prepared, progress_callback=None):
         self.process_count += 1
         if self.order is not None:
             self.order.append(self.label)
-        self.block_object.process()
+        self.block_object.validate()
         return self.block_object
 
 
@@ -44,7 +46,10 @@ class FailingBlockTask:
         self.block_object = block_object
         self.process_count = 0
 
-    def process(self, progress_callback=None):
+    def prepare(self):
+        return self.block_object.prepare()
+
+    def process(self, prepared, progress_callback=None):
         self.process_count += 1
         raise ValueError("permanent failure")
 
@@ -53,9 +58,12 @@ class ProgressBlockTask:
     def __init__(self, block_object):
         self.block_object = block_object
 
-    def process(self, progress_callback=None):
+    def prepare(self):
+        return self.block_object.prepare()
+
+    def process(self, prepared, progress_callback=None):
         progress_callback(0.4)
-        self.block_object.process(progress_callback)
+        self.block_object.validate()
 
 
 def _drain_engine(model, qapp, cycles=5):

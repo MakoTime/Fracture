@@ -31,6 +31,34 @@ def test_colourmap_block_interpolates_and_clamps_rgba_values():
     np.testing.assert_allclose(colours[2], (1.0, 0.0, 0.0, 0.5))
 
 
+def test_colourmap_process_runs_value_calculation():
+    block = ColourmapBlockObject()
+    prepared = block.prepare()
+
+    processed = block.calculate_values(np.array([0.25, 0.75]))
+
+    np.testing.assert_allclose(processed, block.apply(np.array([0.25, 0.75])))
+    assert block.is_valid()
+
+
+def test_colourmap_process_runs_field_calculation():
+    block = ColourmapBlockObject(
+        field1_positions=(0.0, 1.0),
+        field2_positions=(0.0, 1.0),
+        colour_grid=(
+            ((0.0, 0.0, 0.0, 1.0), (1.0, 0.0, 0.0, 1.0)),
+            ((0.0, 1.0, 0.0, 1.0), (1.0, 1.0, 0.0, 1.0)),
+        ),
+    )
+
+    processed = block.calculate_fields((np.array([0.25]), np.array([0.75])))
+
+    np.testing.assert_allclose(
+        processed,
+        block.apply_fields(np.array([0.25]), np.array([0.75])),
+    )
+
+
 def test_colourmap_block_samples_elevation_and_normal_fields():
     block = ColourmapBlockObject(
         field1_positions=(0.0, 1.0),

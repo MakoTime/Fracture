@@ -259,7 +259,7 @@ def test_mesh_generate_model_creates_generation_block_task():
     model = MeshGenerateModel(name="Grid", grid_size=(2, 3, 4))
 
     task = model.to_mesh_generate_task()
-    block = task.process()
+    block = task.execute(task.prepare())
 
     assert isinstance(task, MeshGenerateTask)
     assert block is task.block_object
@@ -449,7 +449,7 @@ def test_mesh_generate_noise_uses_configured_contour_levels():
     model.set_mask("x", np.array([[False, True, True, True]] * 4))
     task = MeshGenerateTask(model)
 
-    block = task.process()
+    block = task.execute(task.prepare())
 
     assert task._contour_levels() == (0.75,)
     assert block.mesh_data.n_points > 0
@@ -789,7 +789,8 @@ def test_edit_generation_clears_removed_perlin_transform():
         noise_enabled=True,
     )
 
-    GeneratedMeshTask(model, block).process()
+    generated_task = GeneratedMeshTask(model, block)
+    generated_task.execute(generated_task.prepare())
 
     assert block.perlin_noise_transform is None
     assert block.noise_enabled is False

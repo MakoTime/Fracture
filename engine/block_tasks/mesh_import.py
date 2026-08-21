@@ -20,28 +20,42 @@ class MeshImportTask:
             comments=model.comments,
         )
 
-    def process(self, progress_callback=None):
+    def prepare(self):
+        return {
+            "source_path": self.model.source_path,
+            "scale": self.model.scale,
+            "rotation": self.model.rotation,
+            "offset": self.model.offset,
+            "low_threshold": self.model.low_threshold,
+            "high_threshold": self.model.high_threshold,
+            "vertical_scale": self.model.vertical_scale,
+        }
+
+    def process(self, prepared, progress_callback=None):
+        return self.execute(prepared, progress_callback)
+
+    def execute(self, prepared, progress_callback=None):
         report = progress_callback or (lambda progress: None)
         report(0.0)
-        if Path(self.model.source_path).suffix.lower() in self.BITMAP_EXTENSIONS:
-            mesh = self._load_bitmap(report)
+        if Path(prepared["source_path"]).suffix.lower() in self.BITMAP_EXTENSIONS:
+            mesh = self._load_bitmap(prepared, report)
         else:
-            mesh = pv.read(self.model.source_path)
+            mesh = pv.read(prepared["source_path"])
             report(0.65)
-        mesh.scale(self.model.scale, inplace=True)
+        mesh.scale(prepared["scale"], inplace=True)
         report(0.75)
-        mesh.rotate_x(self.model.rotation[0], inplace=True)
-        mesh.rotate_y(self.model.rotation[1], inplace=True)
-        mesh.rotate_z(self.model.rotation[2], inplace=True)
+        mesh.rotate_x(prepared["rotation"][0], inplace=True)
+        mesh.rotate_y(prepared["rotation"][1], inplace=True)
+        mesh.rotate_z(prepared["rotation"][2], inplace=True)
         report(0.9)
-        mesh.translate(self.model.offset, inplace=True)
+        mesh.translate(prepared["offset"], inplace=True)
         self.block_object.set_mesh_data(mesh)
-        self.block_object.process()
+        self.block_object.commit()
         report(1.0)
         return self.block_object
 
-    def _load_bitmap(self, progress_callback):
-        image = QImage(self.model.source_path)
+    def _load_bitmap(self, prepared, progress_callback):
+        image = QImage(prepared["source_path"])
         if image.isNull():
             raise ValueError(
                 f"Unable to load elevation bitmap: {self.model.source_path}"
@@ -55,10 +69,10 @@ class MeshImportTask:
         elevations = np.asarray(rows, dtype=float)
         elevations = np.clip(
             elevations,
-            self.model.low_threshold,
-            self.model.high_threshold,
+            prepared["low_threshold"],
+            prepared["high_threshold"],
         )
-        elevations *= self.model.vertical_scale
+        elevations *= prepared["vertical_scale"]
         x_coordinates, y_coordinates = np.meshgrid(
             np.arange(width, dtype=float),
             np.arange(height, dtype=float),

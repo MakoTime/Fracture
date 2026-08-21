@@ -8,6 +8,20 @@ import numpy as np
 from .transform import TransformBlockObject
 
 
+@dataclass(frozen=True)
+class PerlinPrepared:
+    frequencies: tuple[int, ...]
+    amplitudes: tuple[float, ...]
+    seed: int
+    curve_mode: str
+    curve_points: tuple[tuple[float, float], ...]
+    curve_handles: tuple
+    frequency_start: float
+    frequency_end: float
+    sample_count: int
+    manual_sampling: bool
+
+
 @dataclass
 class PerlinNoiseTransformBlockObject(TransformBlockObject):
     """Apply one or more seeded Perlin frequency bands to a scalar field."""
@@ -60,7 +74,30 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             raise ValueError("curve_mode must be discrete or bezier")
         if self.frequency_start >= self.frequency_end:
             raise ValueError("frequency_start must be below frequency_end")
+        return PerlinPrepared(
+            frequencies=tuple(self.frequencies),
+            amplitudes=tuple(self.amplitudes),
+            seed=int(self.seed),
+            curve_mode=self.curve_mode,
+            curve_points=tuple(self.curve_points),
+            curve_handles=tuple(self.curve_handles),
+            frequency_start=float(self.frequency_start),
+            frequency_end=float(self.frequency_end),
+            sample_count=int(self.sample_count),
+            manual_sampling=bool(self.manual_sampling),
+        )
+
+    def process(self, prepared, progress_callback=None):
+        if progress_callback:
+            progress_callback(1.0)
+        self.validate()
         return self
+
+    def calculate_values(self, values, prepared=None):
+        return self._apply_values(values, prepared or self.prepare())
+
+    def calculate_field(self, dimensions, prepared=None):
+        return self._build_noise_field(dimensions, prepared or self.prepare())
 
     def update_configuration(self, **values):
         allowed = {
@@ -85,26 +122,28 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
         self.frequencies = tuple(int(value) for value in self.frequencies)
         self.amplitudes = tuple(float(value) for value in self.amplitudes)
         self.prepare()
-        self.process()
         self.mark_changed()
         return self
 
     def apply(self, values):
-        self.process()
+        return self._apply_values(values, self.prepare())
+
+    def _apply_values(self, values, prepared=None):
+        prepared = prepared or self.prepare()
         field = np.asarray(values, dtype=float)
         if field.ndim != 3:
             raise ValueError("Perlin transforms require a three-dimensional field")
         result = field.copy()
-        total_amplitude = sum(self.amplitudes)
+        total_amplitude = sum(prepared.amplitudes)
         if total_amplitude == 0.0:
             return result
         for index, (frequency, amplitude) in enumerate(
-            zip(self.frequencies, self.amplitudes)
+            zip(prepared.frequencies, prepared.amplitudes)
         ):
             noise = self._build_perlin_noise(
                 field.shape,
                 frequency,
-                self.seed + index,
+                prepared.seed + index,
             )
             result += (noise - 0.5) * amplitude
         return result
@@ -147,19 +186,22 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
 
     def noise_field(self, dimensions):
         """Build a normalized field from this transform's frequency bands."""
-        self.process()
+        return self._build_noise_field(dimensions, self.prepare())
+
+    def _build_noise_field(self, dimensions, prepared=None):
+        prepared = prepared or self.prepare()
         dimensions = tuple(max(1, int(value)) for value in dimensions)
-        total_amplitude = sum(self.amplitudes)
+        total_amplitude = sum(prepared.amplitudes)
         if total_amplitude == 0.0:
             return np.full(dimensions, 0.5, dtype=float)
         field = np.zeros(dimensions, dtype=float)
         for index, (frequency, amplitude) in enumerate(
-            zip(self.frequencies, self.amplitudes)
+            zip(prepared.frequencies, prepared.amplitudes)
         ):
             field += self._build_perlin_noise(
                 dimensions,
                 frequency,
-                self.seed + index,
+                prepared.seed + index,
             ) * amplitude
         return field / total_amplitude
 

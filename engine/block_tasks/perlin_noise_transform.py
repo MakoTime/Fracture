@@ -4,5 +4,11 @@ class PerlinNoiseTransformTask:
     def __init__(self, block_object):
         self.block_object = block_object
 
-    def process(self, progress_callback=None):
-        return self.block_object.process(progress_callback)
+    def prepare(self):
+        return self.block_object.prepare()
+
+    def process(self, prepared, progress_callback=None):
+        self.block_object.validate()
+        if progress_callback:
+            progress_callback(1.0)
+        return self.block_object

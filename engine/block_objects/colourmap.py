@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from pathlib import Path
 from typing import Iterable
 import json
@@ -149,14 +150,53 @@ class ColourmapBlockObject(BlockObject):
         return tuple(normalized)
 
     def prepare(self):
-        return self
+        stops = self._normalize_stops(self.stops)
+        field1_positions = self._normalize_positions(self.field1_positions)
+        field2_positions = self._normalize_positions(self.field2_positions)
+        colour_grid = self._normalize_grid(self.colour_grid)
+        field1_curve_points = self._normalize_curve_points(self.field1_curve_points)
+        field1_curve_handles = self._normalize_curve_handles(self.field1_curve_handles)
+        field2_curve_points = self._normalize_curve_points(self.field2_curve_points)
+        field2_curve_handles = self._normalize_curve_handles(self.field2_curve_handles)
+        if len(colour_grid) != len(field2_positions) or len(
+            colour_grid[0]
+        ) != len(field1_positions):
+            raise ValueError("Colourmap grid must match both field position lists")
+        if self.perlin_noise_transform is not None and not isinstance(
+            self.perlin_noise_transform,
+            PerlinNoiseTransformBlockObject,
+        ):
+            raise TypeError(
+                "perlin_noise_transform must be a "
+                "PerlinNoiseTransformBlockObject"
+            )
+        return MappingProxyType({
+            "stops": stops,
+            "field1_positions": field1_positions,
+            "field2_positions": field2_positions,
+            "colour_grid": colour_grid,
+            "field1_curve_points": field1_curve_points,
+            "field1_curve_handles": field1_curve_handles,
+            "field2_curve_points": field2_curve_points,
+            "field2_curve_handles": field2_curve_handles,
+            "noise_enabled": bool(self.noise_enabled),
+        })
 
-    def process(self, progress_callback=None):
-        self.prepare()
+    def process(self, prepared, progress_callback=None):
         if progress_callback:
             progress_callback(1.0)
         self.validate()
         return self
+
+    def calculate_values(self, values, skip_noise=False):
+        return self._apply_values(values, skip_noise=skip_noise)
+
+    def calculate_fields(self, fields):
+        try:
+            field1, field2 = fields
+        except (TypeError, ValueError) as error:
+            raise ValueError("Colourmap fields must contain exactly two arrays") from error
+        return self._apply_fields(field1, field2)
 
     def update_from(self, source):
         for name in (
@@ -185,7 +225,6 @@ class ColourmapBlockObject(BlockObject):
             getattr(source.perlin_noise_transform, "block_object", source.perlin_noise_transform)
         )
         self.prepare()
-        self.process()
         self.mark_changed()
         return self
 
@@ -226,7 +265,10 @@ class ColourmapBlockObject(BlockObject):
 
     def apply(self, values, skip_noise=False):
         """Map scalar values to interpolated RGBA colours."""
-        self.process()
+        self.prepare()
+        return self._apply_values(values, skip_noise=skip_noise)
+
+    def _apply_values(self, values, skip_noise=False):
         scalar_values = np.asarray(values, dtype=float)
         if (
             not skip_noise
@@ -250,7 +292,10 @@ class ColourmapBlockObject(BlockObject):
 
     def apply_fields(self, field1, field2):
         """Sample the authored two-dimensional colour field at normalized inputs."""
-        self.process()
+        self.prepare()
+        return self._apply_fields(field1, field2)
+
+    def _apply_fields(self, field1, field2):
         first = np.clip(np.asarray(field1, dtype=float), 0.0, 1.0)
         second = np.clip(np.asarray(field2, dtype=float), 0.0, 1.0)
         if first.shape != second.shape:

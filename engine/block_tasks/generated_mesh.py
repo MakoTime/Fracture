@@ -8,22 +8,33 @@ class GeneratedMeshTask:
         self.model = model
         self.block_object = block_object
 
-    def process(self, progress_callback=None):
-        transform = self._perlin_noise_block()
+    def prepare(self):
+        return {
+            "transform": self._perlin_noise_block(),
+            "generation": MeshGenerateTask(self.model).prepare(),
+        }
+
+    def process(self, prepared, progress_callback=None):
+        return self.execute(prepared, progress_callback)
+
+    def execute(self, prepared, progress_callback=None):
+        transform = prepared["transform"]
         self.block_object.set_perlin_noise_transform(transform)
         if transform is not None:
-            transform.prepare()
-            transform.process()
             self.model.perlin_noise_transform = transform
-        generated = MeshGenerateTask(self.model).process(progress_callback)
-        self.block_object.set_grid_data(generated.grid_data)
-        self.block_object.set_mesh_data(generated.mesh_data)
-        self.block_object.set_mask_mesh_data(generated.mask_mesh_data)
-        self.block_object.noise_enabled = generated.noise_enabled
-        self.block_object.set_perlin_noise_transform(
-            generated.perlin_noise_transform
+        generated_task = MeshGenerateTask(self.model)
+        generated_task.execute(
+            prepared["generation"],
+            progress_callback,
         )
-        self.block_object.process()
+        self.block_object.set_grid_data(generated_task.grid_data)
+        self.block_object.set_mesh_data(generated_task.block_object.mesh_data)
+        self.block_object.set_mask_mesh_data(generated_task.block_object.mask_mesh_data)
+        self.block_object.noise_enabled = generated_task.block_object.noise_enabled
+        self.block_object.set_perlin_noise_transform(
+            generated_task.block_object.perlin_noise_transform
+        )
+        self.block_object.commit()
         return self.block_object
 
     def _perlin_noise_block(self):

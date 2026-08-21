@@ -51,7 +51,7 @@ class MeshFilterModel:
             self.noise_maximum,
             self.noise_penetration,
         )
-        task.process()
+        task.execute(task.prepare())
         return task.mesh_data
 
     def generate(self):
@@ -73,7 +73,7 @@ class MeshFilterModel:
             self.noise_penetration,
             block_object=filtered_block,
         )
-        task.process()
+        task.execute(task.prepare())
         filtered_block.add_child_block_object(source_block, dependent=True)
         return MeshObject(
             name=filtered_block.name,

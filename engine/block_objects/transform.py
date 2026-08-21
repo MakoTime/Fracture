@@ -22,8 +22,7 @@ class TransformBlockObject(BlockObject, ABC):
     def prepare(self):
         return self
 
-    def process(self, progress_callback=None):
-        self.prepare()
+    def process(self, prepared, progress_callback=None):
         if progress_callback:
             progress_callback(1.0)
         self.validate()

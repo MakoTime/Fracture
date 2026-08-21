@@ -2,7 +2,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 import inspect
 from threading import Event
-from typing import Callable, Optional
+from typing import Callable, Optional, Protocol
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
@@ -26,6 +26,28 @@ class EngineTask:
     task_id: int = field(default=0)
 
 
+class BlockTask(Protocol):
+    block_object: object
+
+    def prepare(self):
+        ...
+
+    def process(self, prepared, progress_callback=None):
+        ...
+
+
+def _call_with_optional_progress(work, progress_callback):
+    parameters = inspect.signature(work).parameters.values()
+    accepts_progress = any(
+        parameter.kind
+        in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+        for parameter in parameters
+    )
+    if accepts_progress:
+        return work(progress_callback)
+    return work()
+
+
 class TaskSignals(QObject):
     finished = Signal(object)
     updated = Signal(object)
@@ -43,16 +65,7 @@ class TaskWorker(QRunnable):
         self.task.status = TaskStatus.RUNNING
         self.signals.updated.emit(self.task)
         try:
-            parameters = inspect.signature(self.task.work).parameters.values()
-            accepts_progress = any(
-                parameter.kind
-                in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
-                for parameter in parameters
-            )
-            if accepts_progress:
-                self.task.work(self._set_progress)
-            else:
-                self.task.work()
+            _call_with_optional_progress(self.task.work, self._set_progress)
         except Exception as error:
             self.task.error = str(error)
             self.task.status = TaskStatus.FAILED
@@ -108,10 +121,11 @@ class EngineTaskModel(QObject):
     def enqueue_block_task(
         self,
         name: str,
-        block_task,
+        block_task: BlockTask,
         on_finished: Optional[Callable[[EngineTask], None]] = None,
     ) -> EngineTask:
         """Queue a block task and retry it when its block is invalidated."""
+        self._validate_block_task_contract(block_task)
         block_object = block_task.block_object
         if block_object.is_destroyed():
             raise ValueError("Cannot enqueue a task for a destroyed block object")
@@ -125,6 +139,7 @@ class EngineTaskModel(QObject):
                 "waiting_for_children": False,
                 "engine_task": None,
                 "active": True,
+                "prepared": None,
             }
             self._block_tasks[block_object.guid] = binding
             block_object.add_invalidation_callback(self._block_invalidated)
@@ -137,6 +152,31 @@ class EngineTaskModel(QObject):
                 return binding["engine_task"]
 
         return self._enqueue_block_process(binding)
+
+    @staticmethod
+    def _validate_block_task_contract(block_task):
+        prepare = getattr(block_task, "prepare", None)
+        process = getattr(block_task, "process", None)
+        if not callable(prepare) or not callable(process):
+            raise TypeError(
+                "Block tasks must implement prepare() and "
+                "process(prepared, progress_callback=None)"
+            )
+        parameters = list(inspect.signature(process).parameters.values())
+        positional = [
+            parameter
+            for parameter in parameters
+            if parameter.kind
+            in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        if len(positional) != 2 or any(
+            parameter.kind is parameter.VAR_POSITIONAL
+            for parameter in parameters
+        ):
+            raise TypeError(
+                "Block tasks must implement process(prepared, "
+                "progress_callback=None)"
+            )
 
     def remove_block_task(self, block_object):
         """Forget a replaced block task binding before reusing its GUID."""
@@ -156,6 +196,7 @@ class EngineTaskModel(QObject):
             binding["waiting_for_children"] = True
             return binding["engine_task"]
         binding["waiting_for_children"] = False
+        binding["prepared"] = binding["task"].prepare()
         engine_task = self.enqueue(
             binding["name"],
             lambda progress: self._process_block_task(binding, progress),
@@ -201,6 +242,7 @@ class EngineTaskModel(QObject):
         return dependencies_ready
 
     def _enqueue_block_process_without_dependencies(self, binding):
+        binding["prepared"] = binding["task"].prepare()
         engine_task = self.enqueue(
             binding["name"],
             lambda progress: self._process_block_task(binding, progress),
@@ -216,16 +258,7 @@ class EngineTaskModel(QObject):
             return
         if any(not child.is_valid() for child in block_object.child_block_objects):
             return
-        parameters = inspect.signature(binding["task"].process).parameters.values()
-        accepts_progress = any(
-            parameter.kind
-            in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
-            for parameter in parameters
-        )
-        if accepts_progress:
-            binding["task"].process(progress_callback)
-        else:
-            binding["task"].process()
+        binding["task"].process(binding["prepared"], progress_callback)
 
     @staticmethod
     def _task_is_active(task):

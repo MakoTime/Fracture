@@ -28,12 +28,29 @@ class MeshGenerateTask:
             return transform.block_object
         return transform.to_object().block_object
 
-    def process(self, progress_callback=None):
+    def prepare(self):
+        transform = self.block_object.perlin_noise_transform
+        return {
+            "dimensions": tuple(max(1, int(value)) for value in self.model.grid_size),
+            "transform": None if transform is None else transform.prepare(),
+        }
+
+    def process(self, prepared, progress_callback=None):
+        return self.execute(prepared, progress_callback)
+
+    def execute(self, prepared, progress_callback=None):
         report = progress_callback or (lambda progress: None)
         report(0.0)
-        dimensions = tuple(max(1, int(value)) for value in self.model.grid_size)
-        base_grid_data = self._build_grid_data(dimensions, apply_noise=False)
-        self.grid_data = self._build_grid_data(dimensions)
+        dimensions = prepared["dimensions"]
+        base_grid_data = self._build_grid_data(
+            dimensions,
+            apply_noise=False,
+            transform_prepared=prepared["transform"],
+        )
+        self.grid_data = self._build_grid_data(
+            dimensions,
+            transform_prepared=prepared["transform"],
+        )
         self.block_object.set_grid_data(self.grid_data)
         self.block_object.noise_enabled = self._noise_is_active()
         report(0.35)
@@ -49,11 +66,16 @@ class MeshGenerateTask:
                 base_grid_data,
                 isovalue=self._mask_contour_level(),
             ))
-        self.block_object.process()
+        self.block_object.commit()
         report(1.0)
         return self.block_object
 
-    def _build_grid_data(self, dimensions, apply_noise=True):
+    def _build_grid_data(
+        self,
+        dimensions,
+        apply_noise=True,
+        transform_prepared=None,
+    ):
         """Build the field, then apply masks as a final boolean AND."""
         source_grid_data = getattr(self.model, "source_grid_data", None)
         if source_grid_data is not None:
@@ -69,9 +91,10 @@ class MeshGenerateTask:
             surface_mask = active_mask & (field != 0.0)
         if apply_noise and self._noise_is_active():
             transform = self.block_object.perlin_noise_transform
-            transform.prepare()
-            transform.process()
-            noise = transform.noise_field(dimensions)
+            noise = transform._build_noise_field(
+                dimensions,
+                transform_prepared,
+            )
             penetration = max(1, int(self.model.noise_penetration))
             contour_level = self._contour_levels()[0]
             if self.model.flexible_masks:

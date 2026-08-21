@@ -4,12 +4,13 @@ from .block_objects import (
 	PerlinNoiseTransformBlockObject,
 	TransformBlockObject,
 )
-from .task import EngineTask, EngineTaskModel, TaskStatus
+from .task import BlockTask, EngineTask, EngineTaskModel, TaskStatus
 
 __all__ = [
 	"EngineRunner",
 	"EngineTask",
 	"EngineTaskModel",
+	"BlockTask",
 	"MeshBlockObject",
 	"PerlinNoiseTransformBlockObject",
 	"TaskStatus",

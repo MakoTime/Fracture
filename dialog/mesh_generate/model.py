@@ -59,7 +59,8 @@ class MeshGenerateModel:
     def generate(self) -> GeneratedMesh:
         """Synchronously run the generation block task."""
         task = self.to_mesh_generate_task()
-        block_object = task.process()
+        prepared = task.prepare()
+        block_object = task.execute(prepared)
         generated = GeneratedMesh(
             name=self.name.strip() or "Generated Mesh",
             block_object=block_object,

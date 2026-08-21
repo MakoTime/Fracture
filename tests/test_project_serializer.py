@@ -146,7 +146,8 @@ def test_project_round_trip_saves_structured_elevation_block(qapp, tmp_path):
     source_path = tmp_path / "elevation.png"
     assert image.save(str(source_path))
     model = MeshImportModel(source_path=str(source_path))
-    block = model.to_mesh_import_task().process()
+    task = model.to_mesh_import_task()
+    block = task.execute(task.prepare())
 
     table_model = TableModel(TableManager())
     tree_manager = TreeManager()

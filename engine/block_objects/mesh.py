@@ -70,12 +70,22 @@ class MeshBlockObject(BlockObject):
     BITMAP_EXTENSIONS = {".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
     def prepare(self):
-        if self.mesh_data is None:
+        if self.mesh_data is None and self.serialised_path is None:
             raise ValueError("Mesh block has no mesh data")
-        return self
+        return {
+            "mesh_data": self.mesh_data,
+            "serialised_path": self.serialised_path,
+        }
 
-    def process(self, progress_callback=None):
-        self.prepare()
+    def process(self, prepared, progress_callback=None, load_payload=False):
+        return self.execute(prepared, progress_callback, load_payload=load_payload)
+
+    def execute(self, prepared, progress_callback=None, load_payload=False):
+        if load_payload and self.mesh_data is None:
+            serialised_path = prepared["serialised_path"]
+            if serialised_path is None:
+                raise ValueError("Mesh block has no serialised payload")
+            self.mesh_data = pv.read(str(serialised_path))
         if progress_callback:
             progress_callback(1.0)
         self.validate()
@@ -139,10 +149,15 @@ class MeshBlockObject(BlockObject):
     @property
     def scene_data(self):
         """Return the renderable dataset held by this block."""
+        self._load_scene_data()
+        return self.mesh_data
+
+    def _load_scene_data(self):
         if self.mesh_data is None:
-            if self.serialised_path is None:
+            serialised_path = self.serialised_path
+            if serialised_path is None:
                 raise ValueError("Mesh block has no serialised payload")
-            self.mesh_data = pv.read(str(self.serialised_path))
+            self.mesh_data = pv.read(str(serialised_path))
         return self.mesh_data
 
     def release(self):

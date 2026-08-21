@@ -377,7 +377,7 @@ class GenerateMeshWindow(QMainWindow):
         self.model.show_mask_surface = self.show_mask_surface.is_visible()
         self.preview.clear_scene()
         task = self.model.to_mesh_generate_task()
-        block = task.process()
+        block = task.execute(task.prepare())
         if self.model.show_mask_surface and block.mask_mesh_data is not None:
             if block.mask_mesh_data.n_points:
                 self.preview.plotter.add_mesh(

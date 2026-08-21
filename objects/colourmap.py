@@ -56,7 +56,6 @@ class ColourmapObject(ObjectBase):
         return self.colourmap_block_object.field2_name
 
     def apply(self, values):
-        self.block_object.process()
         return self.colourmap_block_object.apply(values)
 
     def add_to_tree(self, tree_manager, parent=None):

@@ -173,6 +173,11 @@ class BlockObject(ABC):
         """Return whether this block can no longer be processed."""
         return self._destroyed
 
+    def commit(self, prepared=None):
+        """Commit a worker result after the task runner has processed it."""
+        self.validate()
+        return self
+
     @abstractmethod
     def prepare(self):
         """Prepare the block object for use in a project.
@@ -183,7 +188,7 @@ class BlockObject(ABC):
         pass
 
     @abstractmethod
-    def process(self, progress_callback=None):
+    def process(self, prepared, progress_callback=None):
         """Process the block object to generate any derived data.
 
         This method is called after the block object has been prepared and

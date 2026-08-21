@@ -381,7 +381,7 @@ class MeshImportController:
             self._show_mesh(mesh_object)
 
         if self.engine_runner is None:
-            import_task.process()
+            import_task.execute(import_task.prepare())
             finish_import(None)
             return None
 
@@ -393,7 +393,7 @@ class MeshImportController:
             )
         return self.engine_runner.enqueue_task(
             f"Import {model.file_name}",
-            import_task.process,
+            lambda progress: import_task.execute(import_task.prepare(), progress),
             on_finished=finish_import,
         )
 
@@ -459,7 +459,9 @@ class MeshImportController:
     @staticmethod
     def _load_mesh(model):
         """Load a mesh synchronously for compatibility with existing callers."""
-        return model.to_mesh_import_task().process().mesh_data
+        task = model.to_mesh_import_task()
+        task.execute(task.prepare())
+        return task.block_object.mesh_data
 
     def _show_mesh(self, mesh_object: MeshObject):
         """Refresh the tree and reveal the newly registered mesh."""

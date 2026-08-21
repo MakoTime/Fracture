@@ -40,5 +40,4 @@ class TransformObject(ObjectBase):
         return self.transform_block_object
 
     def apply(self, values):
-        self.block_object.process()
         return self.transform_block_object.apply(values)

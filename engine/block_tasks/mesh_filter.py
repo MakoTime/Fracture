@@ -23,21 +23,32 @@ class MeshFilterTask:
         self.grid_data = None
         self.mesh_data = None
 
-    def process(self, progress_callback=None):
+    def prepare(self):
+        return {
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "penetration": self.penetration,
+            "transform": self.transform_block.prepare(),
+        }
+
+    def process(self, prepared, progress_callback=None):
+        return self.execute(prepared, progress_callback)
+
+    def execute(self, prepared, progress_callback=None):
         report = progress_callback or (lambda progress: None)
         report(0.0)
-        values = self._filtered_grid_data()
-        isovalue = max(self.minimum, self.maximum)
+        values = self._filtered_grid_data(prepared)
+        isovalue = max(prepared["minimum"], prepared["maximum"])
         mesh_data = self._surface_mesh(values, isovalue)
         self.grid_data = values
         self.mesh_data = mesh_data
         if self.block_object is not None:
             self.block_object.set_mesh_data(mesh_data)
-            self.block_object.process()
+            self.block_object.commit()
         report(1.0)
         return self.block_object if self.block_object is not None else self
 
-    def _filtered_grid_data(self):
+    def _filtered_grid_data(self, prepared):
         values = np.asarray(self.source_block.grid_data, dtype=float).copy()
         if values.ndim != 3:
             raise ValueError("source grid data must be three-dimensional")
@@ -47,16 +58,16 @@ class MeshFilterTask:
             self.transform_block, "noise_field"
         ):
             raise ValueError("a filter transform is required")
-        self.transform_block.prepare()
-        self.transform_block.process()
-
         active = values != 0.0
-        distance = self._surface_distance(active, self.penetration)
+        distance = self._surface_distance(active, prepared["penetration"])
         affected = distance >= 0
-        noise = self.transform_block.noise_field(values.shape)
-        contour_level = max(self.minimum, self.maximum)
+        noise = self.transform_block._build_noise_field(
+            values.shape,
+            prepared["transform"],
+        )
+        contour_level = max(prepared["minimum"], prepared["maximum"])
         values[affected] = contour_level + (
-            distance[affected] / self.penetration - (noise[affected] - 0.5)
+            distance[affected] / prepared["penetration"] - (noise[affected] - 0.5)
         )
         return values
 
