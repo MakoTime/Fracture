@@ -13,7 +13,52 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
-    <widget class="SceneViewer" name="centralwidget"/>
+  <widget class="QTabWidget" name="workspaceTabs">
+   <widget class="QWidget" name="sceneTab">
+    <attribute name="title">
+     <string>Scene</string>
+    </attribute>
+    <layout class="QVBoxLayout" name="sceneTabLayout">
+     <item>
+      <widget class="QSplitter" name="sceneTabSplitter">
+       <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+       </property>
+       <widget class="QSplitter" name="sceneMainSplitter">
+      <property name="orientation">
+       <enum>Qt::Orientation::Horizontal</enum>
+      </property>
+      <widget class="SceneViewer" name="sceneViewer"/>
+      <widget class="QDockWidget" name="worldStateDockWidget">
+       <property name="minimumSize">
+        <size>
+         <width>220</width>
+         <height>120</height>
+        </size>
+       </property>
+       <property name="windowTitle">
+        <string>World State</string>
+       </property>
+       <widget class="WorldStateView" name="worldStateView"/>
+      </widget>
+       </widget>
+       <widget class="QDockWidget" name="sceneDockWidget">
+      <property name="windowTitle">
+       <string>Scene Objects</string>
+      </property>
+      <widget class="QSplitter" name="sceneDockSplitter">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <widget class="EngineRunner" name="engineRunner"/>
+       <widget class="TableView" name="tableView"/>
+      </widget>
+      </widget>
+      </widget>
+         </item>
+        </layout>
+   </widget>
+  </widget>
   <widget class="QDockWidget" name="treeDockWidget">
    <property name="minimumSize">
     <size>
@@ -45,17 +90,6 @@
      </layout>
     </widget>
   </widget>
-  <widget class="QDockWidget" name="worldStateDockWidget">
-   <property name="minimumSize">
-    <size><width>220</width><height>120</height></size>
-   </property>
-   <property name="allowedAreas">
-    <set>Qt::DockWidgetArea::RightDockWidgetArea</set>
-   </property>
-   <property name="windowTitle"><string>World State</string></property>
-   <attribute name="dockWidgetArea"><number>2</number></attribute>
-   <widget class="WorldStateView" name="worldStateView"/>
-  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -79,24 +113,6 @@
    <addaction name="menuEdit"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QDockWidget" name="sceneWidget">
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-    <widget class="QWidget" name="sceneDockContents">
-     <layout class="QVBoxLayout" name="sceneLayout">
-      <item>
-      <widget class="QSplitter" name="sceneSplitter">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <widget class="EngineRunner" name="engineRunner"/>
-             <widget class="TableView" name="tableView"/>
-      </widget>
-      </item>
-     </layout>
-    </widget>
-  </widget>
  </widget>
  <customwidgets>
   <customwidget>

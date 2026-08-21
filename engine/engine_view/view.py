@@ -56,6 +56,16 @@ class EngineRunner(QWidget):
     def enqueue_task(self, name, work, on_finished=None) -> EngineTask:
         return self.task_model.enqueue(name, work, on_finished=on_finished)
 
+    def enqueue_block_task(self, name, block_task, on_finished=None) -> EngineTask:
+        return self.task_model.enqueue_block_task(
+            name,
+            block_task,
+            on_finished=on_finished,
+        )
+
+    def remove_block_task(self, block_object):
+        return self.task_model.remove_block_task(block_object)
+
     def _add_task(self, task: EngineTask):
         row = self.task_table.rowCount()
         self.task_table.insertRow(row)

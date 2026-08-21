@@ -11,6 +11,8 @@ from components.table import TableView
 from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_import.view import MeshImportView
 from components.world_state import WorldStateView
+from dialog.mesh_generate.view import NormalizedSpinBox
+from tools.widgets import DynamicSpinbox
 from objects.object_base import ObjectBase
 
 
@@ -20,6 +22,27 @@ def test_visible_widget_starts_with_invisible_state(qapp):
     assert widget.is_visible() is False
     assert widget.toolTip() == "Show object"
     assert not widget.icon().isNull()
+
+
+def test_normalized_spinbox_uses_a_fine_unit_interval_step(qapp):
+    widget = NormalizedSpinBox()
+
+    assert widget.minimum() == 0.0
+    assert widget.maximum() == 1.0
+    assert widget.decimals() == 3
+    assert widget.singleStep() == 0.01
+
+
+def test_dynamic_spinbox_uses_tenth_of_range_with_base_ten_steps(qapp):
+    widget = DynamicSpinbox()
+    widget.setRange(0.0, 1.0)
+    assert widget.singleStep() == 0.1
+
+    widget.setRange(90.0, 91.0)
+    assert widget.singleStep() == 0.1
+
+    widget.setRange(0.0, 100.0)
+    assert widget.singleStep() == 10.0
 
 
 def test_play_pause_widget_switches_icon_and_tooltip(qapp):

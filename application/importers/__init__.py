@@ -5,6 +5,7 @@ __all__ = [
     "ImportBindingRegistry",
     "MeshImportController",
     "ObjectImporterModel",
+    "TransformController",
     "register_import_binding",
 ]
 
@@ -14,4 +15,8 @@ def __getattr__(name):
         from .mesh_controller import MeshImportController
 
         return MeshImportController
+    if name == "TransformController":
+        from .transform_controller import TransformController
+
+        return TransformController
     raise AttributeError(name)

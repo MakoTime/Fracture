@@ -1,18 +1,24 @@
 from typing import Optional
 
-from PySide6.QtWidgets import QDialog, QTreeView, QWidget
+from PySide6.QtWidgets import QDialog, QTabWidget, QTreeView, QWidget
 
-from components.tree import TreeModel
+from components.tree import TreeModel, TreeSearch
+from components.tree.roots import root_objects
 from components.tree.roots import mesh_root
 from dialog.mesh_edit.factory import create_mesh_edit_dialog
+from dialog.mesh_generate import GenerateMeshWindow
+from dialog.mesh_generate import MeshGenerateModel
 from dialog.mesh_import.factory import (
     create_elevation_import_dialog,
     create_mesh_import_dialog,
 )
+from dialog.notify import create_notification
 from engine import EngineTask
 from engine.block_objects import MeshBlockObject
-from engine.block_tasks import MeshImportTask
+from engine.block_tasks import GeneratedMeshTask, MeshImportTask
+from engine.block_tasks import PerlinNoiseTransformTask
 from objects.mesh_object import MeshObject
+from objects.generated_mesh import GeneratedMesh
 from tools.dropdown import create_dropdown_menu
 
 from .object_importer import ObjectImporterModel
@@ -34,7 +40,12 @@ class MeshImportController:
         self.tree_view = tree_view
         self.parent = parent
         self.engine_runner = engine_runner
-        if hasattr(self.tree_view, "set_context_menu_factory"):
+        self.generate_mesh_window = None
+        if hasattr(self.tree_view, "add_context_menu_factory"):
+            self.tree_view.add_context_menu_factory(
+                self._create_context_menu_for_index
+            )
+        elif hasattr(self.tree_view, "set_context_menu_factory"):
             self.tree_view.set_context_menu_factory(
                 self._create_context_menu_for_index
             )
@@ -64,6 +75,115 @@ class MeshImportController:
         if not model.source_path:
             return None
         return self._queue_import(model)
+
+    def generate_mesh(self):
+        """Open the basic mesh generation workspace in the central tabs."""
+        if self.generate_mesh_window is None:
+            self.generate_mesh_window = GenerateMeshWindow(
+                on_apply=self._register_generated_mesh,
+                tree_search=TreeSearch(root_objects.get_nodes()),
+            )
+            workspace_tabs = (
+                self.parent.findChild(QTabWidget, "workspaceTabs")
+                if self.parent is not None
+                else None
+            )
+            if workspace_tabs is None:
+                self.generate_mesh_window.show()
+                return self.generate_mesh_window
+            workspace_tabs.addTab(self.generate_mesh_window, "Generate Mesh")
+            workspace_tabs.setCurrentWidget(self.generate_mesh_window)
+        elif not self.generate_mesh_window.isVisible():
+            workspace_tabs = (
+                self.parent.findChild(QTabWidget, "workspaceTabs")
+                if self.parent is not None
+                else None
+            )
+            if workspace_tabs is not None and workspace_tabs.indexOf(
+                self.generate_mesh_window
+            ) < 0:
+                workspace_tabs.addTab(self.generate_mesh_window, "Generate Mesh")
+                workspace_tabs.setCurrentWidget(self.generate_mesh_window)
+            else:
+                self.generate_mesh_window.show()
+        return self.generate_mesh_window
+
+    def edit_generation(self, mesh_object: GeneratedMesh):
+        """Open generation settings and replace the existing generated mesh."""
+        window = GenerateMeshWindow(
+            model=MeshGenerateModel.from_generated_mesh(mesh_object),
+            on_apply=lambda edited: self._replace_generated_mesh(mesh_object, edited),
+            tree_search=TreeSearch(root_objects.get_nodes()),
+        )
+        workspace_tabs = (
+            self.parent.findChild(QTabWidget, "workspaceTabs")
+            if self.parent is not None
+            else None
+        )
+        if workspace_tabs is None:
+            window.show()
+        else:
+            workspace_tabs.addTab(window, "Edit Generation")
+            workspace_tabs.setCurrentWidget(window)
+        return window
+
+    def _replace_generated_mesh(self, mesh_object, edited_mesh):
+        was_visible = mesh_object.visible
+        mesh_object.remove_from_scene()
+        mesh_object.mesh_block_object = edited_mesh.mesh_block_object
+        mesh_object.name = edited_mesh.name
+        mesh_object.metadata.update(edited_mesh.metadata)
+        self.object_importer.persist_block(mesh_object.mesh_block_object)
+        self._sync_generated_mesh_children(mesh_object)
+        self._bind_generated_mesh_tasks(mesh_object)
+        if was_visible:
+            self.show_mesh(mesh_object)
+        self.tree_view.model().refresh()
+        return mesh_object
+
+    def _register_generated_mesh(self, mesh_object):
+        """Persist and register a generated mesh when a project is available."""
+        if self.object_importer is None or not hasattr(
+            self.object_importer, "register"
+        ):
+            return mesh_object
+        self.object_importer.persist_block(mesh_object.mesh_block_object)
+        self.object_importer.register(
+            mesh_object,
+            parent=mesh_root,
+            add_to_scene=False,
+        )
+        self._sync_generated_mesh_children(mesh_object)
+        self._bind_generated_mesh_tasks(mesh_object)
+        self._show_mesh(mesh_object)
+        return mesh_object
+
+    def _sync_generated_mesh_children(self, mesh_object):
+        block_children = mesh_object.mesh_block_object.child_block_objects
+        transforms = TreeSearch(root_objects.get_nodes()).find(
+            lambda node: node.block_object in block_children
+        )
+        mesh_object.node.set_block_child_objects(transforms)
+
+    def _bind_generated_mesh_tasks(self, mesh_object):
+        if self.engine_runner is None or not hasattr(
+            self.engine_runner, "enqueue_block_task"
+        ):
+            return
+        block = mesh_object.mesh_block_object
+        child = block.perlin_noise_transform
+        if child is None:
+            return
+        model = MeshGenerateModel.from_generated_mesh(mesh_object)
+        parent_task = GeneratedMeshTask(model, block)
+        self.engine_runner.enqueue_block_task(
+            f"Configure {child.name}",
+            PerlinNoiseTransformTask(child),
+        )
+        self.engine_runner.enqueue_block_task(
+            f"Regenerate {mesh_object.name}",
+            parent_task,
+        )
 
     def edit_mesh(self, mesh_object: MeshObject):
         """Edit an existing mesh after the dialog is accepted."""
@@ -105,6 +225,12 @@ class MeshImportController:
             finish_import(None)
             return None
 
+        if hasattr(self.engine_runner, "enqueue_block_task"):
+            return self.engine_runner.enqueue_block_task(
+                f"Import {model.file_name}",
+                import_task,
+                on_finished=finish_import,
+            )
         return self.engine_runner.enqueue_task(
             f"Import {model.file_name}",
             import_task.process,
@@ -115,9 +241,17 @@ class MeshImportController:
         """Create actions appropriate for a tree node."""
         options = []
         if node is mesh_root:
+            options.append(("Generate Mesh", self.generate_mesh))
             options.append(("Import mesh from 3D object", self.import_mesh))
             options.append(("Import Mesh from elevation data", self.import_elevation))
         elif isinstance(node.node_object, MeshObject):
+            if isinstance(node.node_object, GeneratedMesh):
+                options.append(
+                    (
+                        "Edit Generation",
+                        lambda: self.edit_generation(node.node_object),
+                    )
+                )
             options.append(("Edit Mesh", lambda: self.edit_mesh(node.node_object)))
             options.append(("Show in scene", lambda: self.show_mesh(node.node_object)))
             options.append(("Delete", lambda: self.delete_mesh(node.node_object)))
@@ -125,12 +259,23 @@ class MeshImportController:
 
     def show_mesh(self, mesh_object: MeshObject):
         """Add a mesh to the active scene pipeline if it is not already loaded."""
+        mesh_data = mesh_object.mesh_data
+        if mesh_data is None or getattr(mesh_data, "n_points", 0) == 0:
+            dialog = create_notification(
+                "Cannot show mesh",
+                "This mesh has no surface points to display.",
+                parent=self.parent,
+            )
+            dialog.exec()
+            return None
         mesh_object.set_visible(True)
         self.object_importer.register(mesh_object, parent=mesh_root)
         return mesh_object
 
     def delete_mesh(self, mesh_object: MeshObject):
         """Delete a mesh from the application while preserving no references."""
+        if not self.object_importer.confirm_remove(mesh_object, self.parent):
+            return None
         self.object_importer.remove(mesh_object)
         tree_model = self.tree_view.model()
         if isinstance(tree_model, TreeModel):

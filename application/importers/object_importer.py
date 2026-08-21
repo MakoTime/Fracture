@@ -1,4 +1,6 @@
 from objects.object_base import ObjectBase
+from components.tree import TreeSearch
+from dialog.notify import create_notification
 
 from .registry import ImportBindingRegistry
 
@@ -25,6 +27,15 @@ class ObjectImporterModel:
         add_to_scene=True,
     ):
         """Add an object to the tree and optionally the active scene."""
+        block = getattr(object_base, "block_object", None)
+        if block is not None and not hasattr(
+            object_base, "_importer_destruction_callback"
+        ):
+            def remove_table_row(_block):
+                self.table_model.remove_object(object_base)
+
+            object_base._importer_destruction_callback = remove_table_row
+            block.add_destruction_callback(remove_table_row)
         object_base.add_to_tree(self.tree_manager, parent=parent)
         if not add_to_scene:
             return object_base
@@ -38,10 +49,46 @@ class ObjectImporterModel:
 
     def remove(self, object_base: ObjectBase):
         """Remove an object from the table, scene, and tree."""
-        if not self.table_model.remove_object(object_base):
-            object_base.remove_from_scene()
-        object_base.remove_from_tree()
+        self.table_model.remove_object(object_base)
+        object_base.destroy()
         return object_base
+
+    def associated_parents(self, object_base):
+        """Return tree objects whose blocks reference this object's block."""
+        block = getattr(object_base, "block_object", None)
+        if block is None:
+            return []
+        parents = tuple(block._parent_block_objects)
+        if not hasattr(self.tree_manager, "get_root_nodes"):
+            return []
+        search = TreeSearch(self.tree_manager.get_root_nodes())
+        return search.find(lambda node: node.block_object in parents)
+
+    def confirm_remove(self, object_base, parent=None):
+        """Ask before removing an object referenced by other blocks."""
+        associations = self.associated_parents(object_base)
+        if not associations:
+            return True
+        child_block = object_base.block_object
+        dependent = set(child_block._parent_dependencies)
+        lines = [
+            f"{object_base.name} is referenced by the following objects:",
+        ]
+        for associated in associations:
+            relationship = (
+                "dependent parent"
+                if associated.block_object in dependent
+                else "associated parent"
+            )
+            lines.append(f"- {associated.name} ({relationship})")
+        lines.append("Continue deleting this object?")
+        dialog = create_notification(
+            "Object has dependents",
+            "\n".join(lines),
+            parent=parent,
+            confirm=True,
+        )
+        return dialog.exec() == dialog.DialogCode.Accepted
 
     def bind_registered_features(self, tree_view, parent=None, engine_runner=None):
         """Bind all discovered feature importers to this project."""

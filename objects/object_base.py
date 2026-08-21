@@ -30,13 +30,18 @@ class ObjectBase:
         self.metadata = metadata if metadata is not None else {}
         self.scene_data = scene_data
         self._scene = None
+        self._table_manager = None
         self._change_depth = 0
+        self._destroyed = False
 
         self.node = TreeNode(
             name=self.name,
             icon=self.icon,
             node_object=self,
         )
+        block = getattr(self, "block_object", None)
+        if block is not None and hasattr(block, "add_destruction_callback"):
+            block.add_destruction_callback(self._on_block_destroyed)
         if auto_register_root:
             root_objects.add(self.node)
         self.row_data = RowData(
@@ -49,6 +54,10 @@ class ObjectBase:
 
     def add_to_table(self, table_manager):
         """Add this object's table representation to a table manager."""
+        self._table_manager = table_manager
+        block = getattr(self, "block_object", None)
+        if block is not None and hasattr(block, "add_destruction_callback"):
+            block.add_destruction_callback(self._on_block_destroyed)
         rows = (
             table_manager.get_data()
             if hasattr(table_manager, "get_data")
@@ -94,9 +103,34 @@ class ObjectBase:
 
     def remove_from_tree(self):
         """Remove this object's node from its current tree parent or roots."""
-        if self.node.parent is not None:
-            return self.node.parent.remove_child(self.node)
-        return root_objects.remove(self.node)
+        return root_objects.remove_object(self)
+
+    def destroy(self):
+        """Destroy this object and its engine block, then remove its views."""
+        if self._destroyed:
+            return self
+        self._destroyed = True
+        block = getattr(self, "block_object", None)
+        if block is not None and not block.is_destroyed():
+            block.destroy()
+        self._detach_representations()
+        return self
+
+    def _on_block_destroyed(self, block):
+        del block
+        self._destroyed = True
+        self._detach_representations()
+
+    def _detach_representations(self):
+        """Remove scene, table, and tree representations owned by this object."""
+        if self._table_manager is not None and hasattr(
+            self._table_manager, "remove_object"
+        ):
+            self._table_manager.remove_object(self)
+        self._table_manager = None
+        self.remove_from_scene()
+        self.remove_from_tree()
+        self.node.children.clear()
 
     def set_visible(self, visible: bool):
         """Update visibility through the same callback used by the table."""

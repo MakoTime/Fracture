@@ -11,6 +11,7 @@ class TreeNode:
         self.icon = icon if icon else QIcon()
         self.parent = parent
         self.children = []
+        self._block_child_nodes = []
         self.expanded = False
 
     def add_child(self, child_node):
@@ -23,6 +24,47 @@ class TreeNode:
         self.children.remove(child_node)
         child_node.parent = None
         return True
+
+    def remove_object_nodes(self, node_object):
+        """Remove every descendant node representing ``node_object``."""
+        removed = False
+        for child in tuple(self.children):
+            if child.node_object is node_object:
+                self.remove_child(child)
+                removed = True
+                continue
+            removed = child.remove_object_nodes(node_object) or removed
+        return removed
+
+    def set_block_child_objects(self, objects):
+        """Show existing project objects for this node's block children."""
+        for child_node in tuple(self._block_child_nodes):
+            self.remove_child(child_node)
+        self._block_child_nodes.clear()
+        for object_base in objects:
+            child_node = TreeNode(
+                name=object_base.name,
+                icon=object_base.icon,
+                node_object=object_base,
+            )
+            child_node.is_block_child = True
+            self.add_child(child_node)
+            self._block_child_nodes.append(child_node)
+        return tuple(self._block_child_nodes)
+
+    @property
+    def block_object(self):
+        """Return the engine block owned by this node's project object."""
+        return getattr(self.node_object, "block_object", None)
+
+    def get_block_objects(self):
+        """Return this node's block and the blocks owned by its descendants."""
+        blocks = []
+        if self.block_object is not None:
+            blocks.append(self.block_object)
+        for child in self.children:
+            blocks.extend(child.get_block_objects())
+        return blocks
 
 
 class TreeManager:

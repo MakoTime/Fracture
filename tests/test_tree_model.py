@@ -1,6 +1,7 @@
 from PySide6.QtCore import QModelIndex, Qt
 
-from components.tree import TreeModel, TreeNode
+from components.tree import TreeModel, TreeNode, TreeSearch
+from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 
 
 def test_tree_model_exposes_hierarchy_and_parent_indexes(qapp):
@@ -38,3 +39,42 @@ def test_tree_model_refreshes_after_children_change(qapp):
 
     assert model.rowCount(root_index) == 1
     assert model.data(model.index(0, 0, root_index), Qt.DisplayRole) == "New Child"
+
+
+def test_tree_node_shows_block_child_object_and_search_deduplicates_alias():
+    transform = PerlinNoiseTransformModel(name="Shared").to_object()
+    parent = TreeNode("Generated")
+    transform_root = TreeNode("Transforms")
+    transform_root.add_child(transform.node)
+    parent.set_block_child_objects([transform])
+
+    try:
+        assert parent.children[0].node_object is transform
+        assert parent.children[0].block_object is transform.block_object
+        found = TreeSearch([parent, transform_root]).find()
+        assert found == [transform]
+    finally:
+        transform.remove_from_tree()
+
+
+def test_tree_object_removal_removes_child_aliases():
+    transform = PerlinNoiseTransformModel(name="Shared").to_object()
+    parent = TreeNode("Generated")
+    transform_root = TreeNode("Transforms")
+    transform_root.add_child(transform.node)
+    parent.set_block_child_objects([transform])
+    roots = [parent, transform_root]
+
+    from components.tree.roots import root_objects
+
+    root_objects.nodes.append(parent)
+    root_objects.nodes.append(transform_root)
+    try:
+        transform.destroy()
+        assert parent.children == []
+        assert transform_root.children == []
+    finally:
+        if parent in root_objects.nodes:
+            root_objects.nodes.remove(parent)
+        if transform_root in root_objects.nodes:
+            root_objects.nodes.remove(transform_root)

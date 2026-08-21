@@ -81,6 +81,7 @@ class EngineTaskModel(QObject):
         self._resume_event.set()
         self._thread_pool = QThreadPool(self)
         self._thread_pool.setMaxThreadCount(1)
+        self._block_tasks = {}
 
     @property
     def paused(self):
@@ -103,6 +104,140 @@ class EngineTaskModel(QObject):
         self.task_added.emit(task)
         self._start_next()
         return task
+
+    def enqueue_block_task(
+        self,
+        name: str,
+        block_task,
+        on_finished: Optional[Callable[[EngineTask], None]] = None,
+    ) -> EngineTask:
+        """Queue a block task and retry it when its block is invalidated."""
+        block_object = block_task.block_object
+        if block_object.is_destroyed():
+            raise ValueError("Cannot enqueue a task for a destroyed block object")
+        binding = self._block_tasks.get(block_object.guid)
+        if binding is None:
+            binding = {
+                "name": name,
+                "task": block_task,
+                "on_finished": on_finished,
+                "pending": False,
+                "waiting_for_children": False,
+                "engine_task": None,
+            }
+            self._block_tasks[block_object.guid] = binding
+            block_object.add_invalidation_callback(self._block_invalidated)
+
+        return self._enqueue_block_process(binding)
+
+    def remove_block_task(self, block_object):
+        """Forget a replaced block task binding before reusing its GUID."""
+        binding = self._block_tasks.pop(block_object.guid, None)
+        if binding is None:
+            return False
+        block_object.remove_invalidation_callback(self._block_invalidated)
+        return True
+
+    def _enqueue_block_process(self, binding):
+        if not self._enqueue_invalid_children(binding, set()):
+            binding["waiting_for_children"] = True
+            return binding["engine_task"]
+        binding["waiting_for_children"] = False
+        engine_task = self.enqueue(
+            binding["name"],
+            lambda: self._process_block_task(binding),
+            on_finished=lambda task: self._block_task_finished(binding, task),
+        )
+        binding["engine_task"] = engine_task
+        return engine_task
+
+    def _enqueue_invalid_children(self, binding, visiting):
+        block_object = binding["task"].block_object
+        if block_object.guid in visiting:
+            raise ValueError("Block task dependencies contain a cycle")
+        visiting.add(block_object.guid)
+        dependencies_ready = True
+        for child in block_object.child_block_objects:
+            if child.is_destroyed():
+                continue
+            if child.is_valid():
+                continue
+            child_binding = self._block_tasks.get(child.guid)
+            if child_binding is None:
+                raise ValueError(
+                    f"No block task is registered for invalid child {child.guid}"
+                )
+            current_task = child_binding["engine_task"]
+            if current_task is not None and current_task.status in (
+                TaskStatus.QUEUED,
+                TaskStatus.RUNNING,
+                TaskStatus.PAUSED,
+            ):
+                dependencies_ready = False
+                continue
+            child_dependencies_ready = self._enqueue_invalid_children(
+                child_binding,
+                visiting,
+            )
+            if child_dependencies_ready:
+                self._enqueue_block_process_without_dependencies(child_binding)
+            else:
+                self._enqueue_block_process(child_binding)
+            dependencies_ready = False
+        visiting.remove(block_object.guid)
+        return dependencies_ready
+
+    def _enqueue_block_process_without_dependencies(self, binding):
+        engine_task = self.enqueue(
+            binding["name"],
+            lambda: self._process_block_task(binding),
+            on_finished=lambda task: self._block_task_finished(binding, task),
+        )
+        binding["engine_task"] = engine_task
+        return engine_task
+
+    @staticmethod
+    def _process_block_task(binding):
+        block_object = binding["task"].block_object
+        if block_object.is_destroyed():
+            return
+        if any(not child.is_valid() for child in block_object.child_block_objects):
+            return
+        block_object = binding["task"].process()
+        block_object.validate()
+
+    def _block_invalidated(self, block_object):
+        if block_object.is_destroyed():
+            return
+        binding = self._block_tasks.get(block_object.guid)
+        if binding is None:
+            return
+        current_task = binding["engine_task"]
+        if current_task is not None and current_task.status in (
+            TaskStatus.QUEUED,
+            TaskStatus.RUNNING,
+            TaskStatus.PAUSED,
+        ):
+            binding["pending"] = True
+            return
+        self._enqueue_block_process(binding)
+
+    def _block_task_finished(self, binding, task):
+        if binding["on_finished"] is not None:
+            binding["on_finished"](task)
+        binding["engine_task"] = None
+        if (
+            not binding["task"].block_object.is_destroyed()
+            and (binding["pending"] or not binding["task"].block_object.is_valid())
+        ):
+            binding["pending"] = False
+            self._enqueue_block_process(binding)
+        self._resume_waiting_parents()
+
+    def _resume_waiting_parents(self):
+        for binding in tuple(self._block_tasks.values()):
+            if binding["waiting_for_children"]:
+                self._enqueue_block_process(binding)
 
     def play(self):
         self._paused = False

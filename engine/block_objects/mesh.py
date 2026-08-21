@@ -18,6 +18,9 @@ class MeshBlockObject(BlockObject):
     guid: str = field(default_factory=lambda: str(uuid4()))
     comments: str = ""
     serialised_path: Path | None = field(default=None, repr=False, compare=False)
+
+    __hash__ = BlockObject.__hash__
+
     def __post_init__(self):
         BlockObject.__init__(self, self.name, self.guid, self.comments)
 

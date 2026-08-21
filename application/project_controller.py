@@ -1,11 +1,17 @@
 from pathlib import Path
 
-from PySide6.QtWidgets import QDialog, QFileDialog, QHeaderView
+from PySide6.QtWidgets import (
+    QDialog,
+    QDockWidget,
+    QFileDialog,
+    QHeaderView,
+)
 
 from components.tree import TreeManager, TreeModel
 from components.tree.roots import root_objects
 from menu import setup_menu
 from application.importers import ObjectImporterModel
+from application.importers.transform_controller import TransformController
 from application.project_serializer import ProjectSerializer
 
 
@@ -34,8 +40,10 @@ class ProjectController:
             QHeaderView.ResizeMode.Stretch
         )
         self.window.tableView.clicked.connect(self.table_model.handle_click)
-        self.window.scene_viewer = self.window.centralWidget()
+        self.window.workspace_tabs = self.window.workspaceTabs
+        self.window.scene_viewer = self.window.sceneViewer
         self.window.engine_runner = self.window.engineRunner
+        self._lock_scene_docks()
         self.window.worldStateView.set_scene_model(
             self.window.scene_viewer.scene_model
         )
@@ -52,6 +60,14 @@ class ProjectController:
                 engine_runner=self.window.engine_runner,
             )
         )
+        self.controllers.append(
+            TransformController(
+                object_importer=self.object_importer,
+                tree_view=self.window.treeWidget,
+                parent=self.window,
+                engine_runner=self.window.engineRunner,
+            )
+        )
         if menu_bar is None:
             setup_menu(self.window)
             self.window.save_action.triggered.connect(
@@ -64,6 +80,15 @@ class ProjectController:
                 lambda checked=False: self.open_project()
             )
         return self.window
+
+    def _lock_scene_docks(self):
+        """Keep Scene-tab panels embedded and resizable without controls."""
+        dock_features = QDockWidget.DockWidgetFeature.NoDockWidgetFeatures
+        for dock_name in ("sceneDockWidget", "worldStateDockWidget"):
+            dock = self.window.findChild(QDockWidget, dock_name)
+            if dock is not None:
+                dock.setFeatures(dock_features)
+                dock.setFloating(False)
 
     def save_project(self):
         """Save the current project to its active project file."""

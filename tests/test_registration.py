@@ -1,18 +1,37 @@
 from types import SimpleNamespace
 
+import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage
 
 from components.table import TableManager, TableModel
 from components.tree import TreeModel
-from components.tree.roots import mesh_root, root_objects
+from components.tree.roots import mesh_root, root_objects, transform_root
 from dialog.mesh_import.model import MeshImportModel
+from dialog.mesh_generate import GenerateMeshWindow, MeshGenerateModel
+from dialog.mesh_mask import SurfaceMaskModel
+from dialog.mesh_mask.view import MaskCanvas
 from dialog.mesh_edit.model import MeshEditModel
 from engine.block_objects import MeshBlockObject
 from engine.block_tasks import MeshImportTask
+from engine.block_tasks import MeshGenerateTask
+from engine.block_tasks.generated_mesh import GeneratedMeshTask
+from engine.block_objects import GeneratedMeshBlockObject
 from objects.mesh_object import MeshObject
+from objects.generated_mesh import GeneratedMesh
 from application.importers import MeshImportController, ObjectImporterModel
+from application.importers import TransformController
+from dialog.perlin_noise_transform import PerlinNoiseTransformModel
+from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from objects.object_base import ObjectBase
+
+
+def _perlin_transform(size=4, seed=0, amplitude=1.0):
+    return PerlinNoiseTransformModel(
+        frequencies=(size,),
+        amplitudes=(amplitude,),
+        seed=seed,
+    ).to_object()
 
 
 def test_bitmap_elevation_map_creates_structured_grid(qapp, tmp_path):
@@ -59,9 +78,454 @@ def test_mesh_root_menu_separates_import_types(qapp):
     menu = controller.create_context_menu(mesh_root)
 
     assert [action.text() for action in menu.actions()] == [
+        "Generate Mesh",
         "Import mesh from 3D object",
         "Import Mesh from elevation data",
     ]
+
+
+def test_perlin_transform_menu_includes_edit_action(qapp):
+    controller = TransformController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+    transform = PerlinNoiseTransformModel(
+        name="Editable transform",
+    ).to_object()
+
+    menu = controller.create_context_menu(transform.node)
+
+    assert [action.text() for action in menu.actions()] == ["Edit", "Delete"]
+    transform.remove_from_tree()
+
+
+def test_perlin_transform_registration_enqueues_block_task(qapp):
+    queued = []
+    importer = SimpleNamespace(
+        register=lambda transform, parent, add_to_scene: transform,
+    )
+    runner = SimpleNamespace(
+        enqueue_block_task=lambda name, task: queued.append((name, task))
+    )
+    controller = TransformController(
+        object_importer=importer,
+        tree_view=SimpleNamespace(model=lambda: None),
+        engine_runner=runner,
+    )
+
+    controller._register(PerlinNoiseTransformModel().to_object())
+
+    assert len(queued) == 1
+    assert queued[0][0].startswith("Generate Perlin Noise Transform")
+
+
+def test_generate_mesh_opens_standalone_window(qapp):
+    controller = MeshImportController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+
+    window = controller.generate_mesh()
+
+    assert window.windowTitle() == "Generate Mesh"
+    assert window.isVisible() is True
+    window.close()
+
+
+def test_generate_mesh_flexible_checkbox_controls_grid_size_editing(qapp):
+    window = GenerateMeshWindow()
+
+    assert window.flexible_grid.isChecked()
+    assert window.grid_size.isEnabled()
+
+    window.flexible_grid.setChecked(False)
+    assert window.model.flexible_grid is False
+    assert window.grid_size.isEnabled() is False
+
+    window.flexible_grid.setChecked(True)
+    assert window.model.flexible_grid is True
+    assert window.grid_size.isEnabled()
+    window.close()
+
+
+def test_generate_mesh_grid_point_size_is_adaptive_within_bounds():
+    minimum = GenerateMeshWindow.GRID_POINT_SIZE_MIN
+    maximum = GenerateMeshWindow.GRID_POINT_SIZE_MAX
+
+    assert GenerateMeshWindow._adaptive_grid_point_size(1) == maximum
+    assert GenerateMeshWindow._adaptive_grid_point_size(1_000) == 7.0
+    assert GenerateMeshWindow._adaptive_grid_point_size(1_000_000) == minimum
+
+
+def test_generate_mesh_resizes_flexible_masks_with_grid():
+    mask = np.array([[True, False], [False, True]])
+
+    resized = GenerateMeshWindow._resize_mask(mask, (4, 4))
+
+    assert resized.shape == (4, 4)
+    np.testing.assert_array_equal(
+        resized,
+        np.array(
+            [
+                [True, True, False, False],
+                [True, True, False, False],
+                [False, False, True, True],
+                [False, False, True, True],
+            ]
+        ),
+    )
+
+
+def test_generate_mesh_grid_point_alpha_slider_updates_preview_setting(qapp):
+    window = GenerateMeshWindow()
+
+    window.grid_point_alpha.setValue(35)
+
+    assert window.grid_point_alpha_value.text() == "35%"
+    window.close()
+
+
+def test_mesh_generate_model_creates_empty_mesh():
+    model = MeshGenerateModel(name="Grid", grid_size=(2, 3, 4))
+
+    mesh = model.generate()
+
+    assert mesh.name == "Grid"
+    assert isinstance(mesh, GeneratedMesh)
+    assert mesh.mesh_data.n_points == 0
+    assert mesh.grid_shape == (2, 3, 4)
+    assert mesh.grid_data.dtype == float
+    assert model.grid_points().shape == (24, 3)
+
+
+def test_mesh_generate_model_creates_generation_block_task():
+    model = MeshGenerateModel(name="Grid", grid_size=(2, 3, 4))
+
+    task = model.to_mesh_generate_task()
+    block = task.process()
+
+    assert isinstance(task, MeshGenerateTask)
+    assert block is task.block_object
+    assert isinstance(block, GeneratedMeshBlockObject)
+    assert block.name == "Grid"
+    assert block.mesh_data.n_points == 0
+    assert task.grid_data.shape == (2, 3, 4)
+    assert task.grid_data.dtype == float
+
+
+def test_generate_mesh_grid_points_use_block_values_as_scalars():
+    model = MeshGenerateModel(grid_size=(2, 2, 2))
+    values = np.arange(8, dtype=float).reshape((2, 2, 2))
+
+    point_cloud = GenerateMeshWindow._build_grid_point_cloud(
+        model.grid_points(),
+        values,
+    )
+
+    np.testing.assert_array_equal(point_cloud.point_data["grid_value"], values.ravel())
+
+
+def test_mesh_generate_task_extracts_scalar_isosurface():
+    values = np.zeros((3, 3, 3), dtype=float)
+    values[1:, :, :] = 1.0
+
+    mesh = MeshGenerateTask._build_surface_mesh(values, isovalue=0.5)
+
+    assert mesh.n_points > 0
+    assert mesh.n_cells > 0
+
+
+def test_mesh_generate_noise_is_limited_to_surface_penetration():
+    model = MeshGenerateModel(
+        grid_size=(5, 5, 5),
+        noise_enabled=True,
+        noise_penetration=1,
+        perlin_noise_transform=_perlin_transform(seed=11),
+    )
+    model.set_mask("x", np.array([[True, False, True, True, True]] * 5))
+    field = MeshGenerateTask(model)._build_grid_data((5, 5, 5))
+
+    assert field[2, 3, 3] == 1.0
+    assert np.any(field[:, 0, 2] != 1.0)
+    assert np.all(field[:, :, 1] == 0.0)
+
+    model.perlin_noise_transform.block_object.seed = 12
+    other_field = MeshGenerateTask(model)._build_grid_data((5, 5, 5))
+    assert not np.array_equal(field, other_field)
+
+
+def test_mesh_generate_noise_perturbs_a_masked_surface_field():
+    model = MeshGenerateModel(grid_size=(4, 4, 4))
+    model.set_mask("x", np.array([[False, True, True, True]] * 4))
+    baseline = MeshGenerateTask(model)._build_grid_data((4, 4, 4))
+    model.noise_enabled = True
+    model.perlin_noise_transform = _perlin_transform(amplitude=0.5)
+    noisy = MeshGenerateTask(model)._build_grid_data((4, 4, 4))
+
+    assert not np.array_equal(noisy, baseline)
+
+
+def test_mesh_generate_noise_does_nothing_without_a_perlin_transform():
+    model = MeshGenerateModel(
+        grid_size=(4, 4, 4),
+        noise_enabled=True,
+    )
+    model.set_mask("x", np.array([[False, True, True, True]] * 4))
+
+    task = MeshGenerateTask(model)
+    field = task._build_grid_data((4, 4, 4))
+
+    active_mask = task._build_active_mask((4, 4, 4))
+    assert np.all(field[active_mask] == 1.0)
+    assert np.all(field[~active_mask] == 0.0)
+
+
+def test_mesh_generate_noise_follows_an_interior_mask_edge():
+    model = MeshGenerateModel(
+        grid_size=(5, 5, 5),
+        noise_enabled=True,
+        perlin_noise_transform=_perlin_transform(seed=11),
+        noise_penetration=1,
+    )
+    mask = np.ones((5, 5), dtype=bool)
+    mask[1, 1] = False
+    model.set_mask("x", mask)
+
+    field = MeshGenerateTask(model)._build_grid_data((5, 5, 5))
+
+    assert np.all(field[:, 1, 1] == 0.0)
+    assert np.any(field[:, 0:3, 1:3] != 1.0)
+    assert field[2, 3, 3] == 1.0
+
+
+def test_mesh_generate_noise_displaces_the_contour_band():
+    model = MeshGenerateModel(
+        grid_size=(5, 5, 5),
+        noise_enabled=True,
+        perlin_noise_transform=_perlin_transform(seed=11),
+    )
+    model.set_mask("x", np.array([[True, False, True, True, True]] * 5))
+    task = MeshGenerateTask(model)
+
+    field = task._build_grid_data((5, 5, 5))
+
+    active_values = field[task._build_active_mask((5, 5, 5))]
+    assert active_values.min() < 0.75
+    assert active_values.max() > 0.75
+
+
+def test_mesh_generate_transform_frequency_and_penetration_change_mesh_shape():
+    mask = np.ones((12, 12), dtype=bool)
+    mask[6:, :] = False
+    base_settings = dict(
+        grid_size=(12, 12, 12),
+        noise_enabled=True,
+        x_mask=mask,
+    )
+    low_frequency = MeshGenerateModel(
+        **base_settings,
+        perlin_noise_transform=_perlin_transform(size=2, seed=11),
+        noise_penetration=1,
+    ).generate().mesh_data
+    high_frequency = MeshGenerateModel(
+        **base_settings,
+        perlin_noise_transform=_perlin_transform(size=8, seed=11),
+        noise_penetration=1,
+    ).generate().mesh_data
+    deep_penetration = MeshGenerateModel(
+        **base_settings,
+        perlin_noise_transform=_perlin_transform(seed=11),
+        noise_penetration=6,
+    ).generate().mesh_data
+
+    assert not np.array_equal(low_frequency.points, high_frequency.points)
+    assert deep_penetration.n_points != high_frequency.n_points
+
+
+def test_mesh_generate_transform_displacement_blends_from_original_field():
+    mask = np.ones((8, 8), dtype=bool)
+    mask[4:, :] = False
+    model = MeshGenerateModel(
+        grid_size=(8, 8, 8),
+        noise_enabled=True,
+        noise_penetration=4,
+        x_mask=mask,
+    )
+    baseline = MeshGenerateTask(model)._build_grid_data((8, 8, 8))
+
+    model.perlin_noise_transform = _perlin_transform()
+    displaced = MeshGenerateTask(model)._build_grid_data((8, 8, 8))
+
+    active = MeshGenerateTask(model)._build_active_mask((8, 8, 8))
+    assert np.all(baseline[active] == 1.0)
+    assert not np.array_equal(baseline, displaced)
+
+
+def test_mesh_generate_surface_distance_uses_mask_edges_not_grid_edges():
+    active_mask = np.ones((5, 5, 5), dtype=bool)
+    active_mask[:, 2, 2] = False
+
+    distance = MeshGenerateTask._build_surface_distance(active_mask, 3)
+
+    assert distance[2, 1, 2] == 0
+    assert distance[2, 0, 2] == 1
+    assert distance[2, 0, 0] == -1
+
+
+def test_mesh_generate_penetration_one_targets_nodes_adjacent_to_falling_edge():
+    active_mask = np.ones((6, 6, 6), dtype=bool)
+    active_mask[3:, :, :] = False
+
+    distance = MeshGenerateTask._build_surface_distance(active_mask, 1)
+
+    assert np.all(distance[2, :, :] == 0)
+    assert np.all(distance[:2, :, :] == -1)
+    assert np.all(distance[3:, :, :] == -1)
+
+
+def test_mesh_generate_noise_uses_configured_contour_levels():
+    model = MeshGenerateModel(
+        grid_size=(4, 4, 4),
+        noise_enabled=True,
+        perlin_noise_transform=_perlin_transform(),
+    )
+    model.set_mask("x", np.array([[False, True, True, True]] * 4))
+    task = MeshGenerateTask(model)
+
+    block = task.process()
+
+    assert task._contour_levels() == (0.75,)
+    assert block.mesh_data.n_points > 0
+    assert block.mask_mesh_data.n_points > 0
+
+
+def test_mesh_generate_masks_remain_zero_after_noise_is_applied():
+    model = MeshGenerateModel(
+        grid_size=(4, 4, 4),
+        noise_enabled=True,
+        perlin_noise_transform=_perlin_transform(),
+        flexible_masks=False,
+    )
+    model.set_mask("x", np.array([[False, True, True, True]] * 4))
+
+    field = MeshGenerateTask(model)._build_grid_data((4, 4, 4))
+
+    assert np.all(field[:, :, 0] == 0.0)
+    assert np.any(field[:, :, 1:] != 0.0)
+
+
+def test_mesh_generate_flexible_mask_can_displace_both_sides_of_edge():
+    model = MeshGenerateModel(
+        grid_size=(6, 6, 6),
+        noise_enabled=True,
+        perlin_noise_transform=_perlin_transform(),
+        noise_penetration=2,
+        flexible_masks=True,
+    )
+    model.set_mask("x", np.array([[True, False, True, True, True, True]] * 6))
+
+    field = MeshGenerateTask(model)._build_grid_data((6, 6, 6))
+
+    assert np.any(field[:, :, 1] != 0.0)
+
+
+def test_surface_masks_penetrate_their_corresponding_grid_axis():
+    model = MeshGenerateModel(grid_size=(3, 4, 5))
+    model.set_mask("x", np.array([[True, False, True, False, True]] * 4))
+    model.set_mask("y", np.ones((3, 5), dtype=bool))
+    model.set_mask("z", np.ones((3, 4), dtype=bool))
+
+    field = MeshGenerateTask(model)._build_grid_data((3, 4, 5))
+
+    assert field.shape == (3, 4, 5)
+    assert np.all(field[:, :, 0])
+    assert not np.any(field[:, :, 1])
+    assert np.all(field[:, :, 2])
+
+
+def test_blank_surface_masks_are_full():
+    model = MeshGenerateModel(grid_size=(2, 3, 4))
+
+    field = MeshGenerateTask(model)._build_grid_data((2, 3, 4))
+
+    assert np.all(field == 1.0)
+
+
+def test_surface_mask_view_axes_preserve_world_orientation():
+    for axis, stored_shape, view_axes, view_shape in (
+        ("X", (2, 3), ("Y", "Z"), (3, 2)),
+        ("Y", (2, 4), ("X", "Z"), (4, 2)),
+        ("Z", (2, 3), ("X", "Y"), (3, 2)),
+    ):
+        model = SurfaceMaskModel(axis, stored_shape)
+        values = np.arange(np.prod(view_shape)).reshape(view_shape) % 2 == 0
+
+        assert model.view_axes == view_axes
+        assert model.view_shape == view_shape
+        model.set_view_values(values)
+        np.testing.assert_array_equal(model.view_values(), values)
+
+
+def test_surface_mask_canvas_top_row_maps_to_high_vertical_index():
+    for axis, shape in (("X", (2, 3)), ("Y", (2, 3)), ("Z", (2, 3))):
+        model = SurfaceMaskModel(axis, shape)
+        view_values = np.zeros(model.view_shape, dtype=bool)
+        view_values[0, 0] = True
+
+        model.set_view_values(view_values)
+
+        expected = np.zeros(shape, dtype=bool)
+        expected[0, -1] = True
+        np.testing.assert_array_equal(model.mask, expected)
+
+
+def test_surface_mask_drag_interpolation_fills_skipped_cells():
+    cells = MaskCanvas._line_cells((0, 0), (5, 8))
+
+    assert cells[0] == (0, 0)
+    assert cells[-1] == (5, 8)
+    assert len(cells) == 9
+    assert all(
+        max(abs(next_row - row), abs(next_column - column)) <= 1
+        for (row, column), (next_row, next_column) in zip(cells, cells[1:])
+    )
+
+
+def test_generated_mesh_validates_three_dimensional_scalar_field():
+    mesh = GeneratedMesh("Grid", grid_data=[[[1, 0], [0, 1]]])
+
+    assert mesh.grid_shape == (1, 2, 2)
+    assert mesh.grid_data.dtype == float
+    assert mesh.grid_data.tolist() == [[[1.0, 0.0], [0.0, 1.0]]]
+
+    try:
+        GeneratedMesh("Invalid", grid_data=[[True, False]])
+    except ValueError as error:
+        assert "three-dimensional scalar field" in str(error)
+    else:
+        raise AssertionError("two-dimensional scalar data should be rejected")
+
+
+def test_generated_mesh_rejects_non_finite_scalar_values():
+    try:
+        GeneratedMesh("Invalid", grid_data=[[[float("nan")]]])
+    except ValueError as error:
+        assert "finite" in str(error)
+    else:
+        raise AssertionError("non-finite scalar data should be rejected")
+
+
+def test_generate_mesh_apply_creates_mesh(qapp):
+    generated = []
+    window = GenerateMeshWindow(on_apply=generated.append)
+    window.name_field.setText("Applied Grid")
+    window.grid_size.set_value((2, 2, 2))
+
+    window._apply()
+
+    assert generated[0].name == "Applied Grid"
+    assert generated[0].mesh_data.n_points == 0
+    window.close()
 
 
 def test_mesh_object_menu_includes_edit_action(qapp):
@@ -78,6 +542,116 @@ def test_mesh_object_menu_includes_edit_action(qapp):
         "Show in scene",
         "Delete",
     ]
+
+
+def test_generated_mesh_menu_includes_edit_generation_action(qapp):
+    controller = MeshImportController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(),
+    )
+    mesh_object = MeshGenerateModel(
+        name="Generated",
+        grid_size=(2, 3, 4),
+        noise_enabled=True,
+    ).generate()
+
+    menu = controller.create_context_menu(mesh_object.node)
+
+    assert [action.text() for action in menu.actions()] == [
+        "Edit Generation",
+        "Edit Mesh",
+        "Show in scene",
+        "Delete",
+    ]
+
+
+def test_generated_mesh_generation_settings_can_reopen():
+    model = MeshGenerateModel(
+        name="Generated",
+        grid_size=(2, 3, 4),
+        flexible_grid=False,
+        flexible_masks=False,
+        show_mask_surface=False,
+        noise_enabled=True,
+        noise_minimum=0.2,
+        noise_maximum=0.8,
+        noise_penetration=2,
+        perlin_noise_transform=_perlin_transform(size=7, seed=23),
+    )
+    model.set_mask("x", np.ones((3, 4), dtype=bool))
+    mesh_object = model.generate()
+
+    reopened = MeshGenerateModel.from_generated_mesh(mesh_object)
+
+    assert reopened.name == model.name
+    assert reopened.grid_size == model.grid_size
+    assert reopened.flexible_grid is False
+    assert reopened.flexible_masks is False
+    assert reopened.show_mask_surface is False
+    assert reopened.noise_enabled is True
+    assert reopened.noise_minimum == 0.2
+    assert reopened.noise_maximum == 0.8
+    assert reopened.perlin_noise_transform.frequencies == (7,)
+    assert reopened.perlin_noise_transform.seed == 23
+    assert reopened.noise_penetration == 2
+    np.testing.assert_array_equal(reopened.x_mask, model.x_mask)
+
+
+def test_edit_generation_masks_rebuild_from_the_unmasked_source():
+    initial_mask = np.ones((6, 6), dtype=bool)
+    initial_mask[:3, :] = False
+    model = MeshGenerateModel(grid_size=(6, 6, 6), x_mask=initial_mask)
+    mesh_object = model.generate()
+
+    reopened = MeshGenerateModel.from_generated_mesh(mesh_object)
+    updated_mask = np.ones((6, 6), dtype=bool)
+    updated_mask[3:, :] = False
+    reopened.set_mask("x", updated_mask)
+    rebuilt = reopened.generate()
+
+    assert rebuilt.mesh_data.n_points > 0
+
+
+def test_edit_generation_rebuilds_from_the_held_grid():
+    held_grid = np.zeros((3, 3, 3), dtype=float)
+    held_grid[1:, :, :] = 1.0
+    mesh_object = GeneratedMesh("Held Grid", grid_data=held_grid)
+
+    model = MeshGenerateModel.from_generated_mesh(mesh_object)
+    rebuilt = MeshGenerateTask(model)._build_grid_data((3, 3, 3))
+
+    np.testing.assert_array_equal(rebuilt, held_grid)
+
+
+def test_edit_generation_noise_changes_the_held_grid():
+    held_grid = np.zeros((4, 4, 4), dtype=float)
+    held_grid[1:, :, :] = 1.0
+    mesh_object = GeneratedMesh("Held Grid", grid_data=held_grid)
+    model = MeshGenerateModel.from_generated_mesh(mesh_object)
+    model.noise_enabled = True
+    model.perlin_noise_transform = _perlin_transform()
+
+    rebuilt = MeshGenerateTask(model)._build_grid_data((4, 4, 4))
+
+    assert not np.array_equal(rebuilt, held_grid)
+
+
+def test_edit_generation_clears_removed_perlin_transform():
+    model = MeshGenerateModel(
+        grid_size=(3, 3, 3),
+        noise_enabled=True,
+        perlin_noise_transform=None,
+    )
+    block = GeneratedMeshBlockObject(
+        grid_data=np.ones((3, 3, 3)),
+        perlin_noise_transform=_perlin_transform().block_object,
+        noise_enabled=True,
+    )
+
+    GeneratedMeshTask(model, block).process()
+
+    assert block.perlin_noise_transform is None
+    assert block.noise_enabled is False
 
 
 def test_mesh_edit_model_updates_existing_mesh(qapp):

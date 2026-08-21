@@ -1,5 +1,9 @@
 from .engine_view import EngineRunner
-from .block_objects import MeshBlockObject
+from .block_objects import (
+	MeshBlockObject,
+	PerlinNoiseTransformBlockObject,
+	TransformBlockObject,
+)
 from .task import EngineTask, EngineTaskModel, TaskStatus
 
 __all__ = [
@@ -7,5 +11,7 @@ __all__ = [
 	"EngineTask",
 	"EngineTaskModel",
 	"MeshBlockObject",
+	"PerlinNoiseTransformBlockObject",
 	"TaskStatus",
+	"TransformBlockObject",
 ]

@@ -8,6 +8,7 @@ from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from .model import SceneModel
+from .sky_dome import SkyDome
 
 
 class SceneViewer(QWidget):
@@ -17,6 +18,7 @@ class SceneViewer(QWidget):
         super().__init__(parent)
         self.scene_model = scene_model or SceneModel()
         self._actors = {}
+        self.sky_dome = SkyDome()
         self.plotter = QtInteractor(self)
         self._pan_anchor = None
         self._pan_active = False
@@ -28,6 +30,8 @@ class SceneViewer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.plotter.interactor)
+        self.plotter.set_background("#465568")
+        self.sky_dome.add_to(self.plotter)
         self._restore_lighting()
         self.plotter.show_axes()
 
@@ -82,6 +86,9 @@ class SceneViewer(QWidget):
     def reset_camera(self):
         """Fit all visible scene data in the render window."""
         self.plotter.reset_camera()
+        self.plotter.camera.SetClippingRange(
+            0.01, self.sky_dome.radius * 2.0
+        )
         self.plotter.render()
 
     def _pan_camera(self, position):
@@ -188,6 +195,8 @@ class SceneViewer(QWidget):
 
     def clear_scene(self):
         self.plotter.clear()
+        self.sky_dome.remove()
+        self.sky_dome.add_to(self.plotter)
         self._restore_lighting()
         self._actors.clear()
         self.scene_model.clear()
