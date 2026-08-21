@@ -42,6 +42,8 @@ class ObjectBase:
         block = getattr(self, "block_object", None)
         if block is not None and hasattr(block, "add_destruction_callback"):
             block.add_destruction_callback(self._on_block_destroyed)
+        if block is not None and hasattr(block, "add_change_callback"):
+            block.add_change_callback(self._on_block_changed)
         if auto_register_root:
             root_objects.add(self.node)
         self.row_data = RowData(
@@ -58,6 +60,8 @@ class ObjectBase:
         block = getattr(self, "block_object", None)
         if block is not None and hasattr(block, "add_destruction_callback"):
             block.add_destruction_callback(self._on_block_destroyed)
+        if block is not None and hasattr(block, "add_change_callback"):
+            block.add_change_callback(self._on_block_changed)
         rows = (
             table_manager.get_data()
             if hasattr(table_manager, "get_data")
@@ -120,6 +124,14 @@ class ObjectBase:
         del block
         self._destroyed = True
         self._detach_representations()
+
+    def _on_block_changed(self, block):
+        if self._table_manager is not None and hasattr(
+            self._table_manager, "refresh_object"
+        ):
+            self._table_manager.refresh_object(self)
+        if self._scene is not None and hasattr(self._scene, "refresh_object"):
+            self._scene.refresh_object(self)
 
     def _detach_representations(self):
         """Remove scene, table, and tree representations owned by this object."""

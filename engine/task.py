@@ -124,9 +124,17 @@ class EngineTaskModel(QObject):
                 "pending": False,
                 "waiting_for_children": False,
                 "engine_task": None,
+                "active": True,
             }
             self._block_tasks[block_object.guid] = binding
             block_object.add_invalidation_callback(self._block_invalidated)
+        else:
+            binding["name"] = name
+            binding["task"] = block_task
+            binding["on_finished"] = on_finished
+            if self._task_is_active(binding["engine_task"]):
+                binding["pending"] = True
+                return binding["engine_task"]
 
         return self._enqueue_block_process(binding)
 
@@ -135,17 +143,22 @@ class EngineTaskModel(QObject):
         binding = self._block_tasks.pop(block_object.guid, None)
         if binding is None:
             return False
+        binding["active"] = False
         block_object.remove_invalidation_callback(self._block_invalidated)
         return True
 
     def _enqueue_block_process(self, binding):
+        if not binding["active"]:
+            return None
+        if self._task_is_active(binding["engine_task"]):
+            return binding["engine_task"]
         if not self._enqueue_invalid_children(binding, set()):
             binding["waiting_for_children"] = True
             return binding["engine_task"]
         binding["waiting_for_children"] = False
         engine_task = self.enqueue(
             binding["name"],
-            lambda: self._process_block_task(binding),
+            lambda progress: self._process_block_task(binding, progress),
             on_finished=lambda task: self._block_task_finished(binding, task),
         )
         binding["engine_task"] = engine_task
@@ -190,43 +203,59 @@ class EngineTaskModel(QObject):
     def _enqueue_block_process_without_dependencies(self, binding):
         engine_task = self.enqueue(
             binding["name"],
-            lambda: self._process_block_task(binding),
+            lambda progress: self._process_block_task(binding, progress),
             on_finished=lambda task: self._block_task_finished(binding, task),
         )
         binding["engine_task"] = engine_task
         return engine_task
 
     @staticmethod
-    def _process_block_task(binding):
+    def _process_block_task(binding, progress_callback=None):
         block_object = binding["task"].block_object
         if block_object.is_destroyed():
             return
         if any(not child.is_valid() for child in block_object.child_block_objects):
             return
-        block_object = binding["task"].process()
-        block_object.validate()
+        parameters = inspect.signature(binding["task"].process).parameters.values()
+        accepts_progress = any(
+            parameter.kind
+            in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+            for parameter in parameters
+        )
+        if accepts_progress:
+            binding["task"].process(progress_callback)
+        else:
+            binding["task"].process()
+
+    @staticmethod
+    def _task_is_active(task):
+        return task is not None and task.status in (
+            TaskStatus.QUEUED,
+            TaskStatus.RUNNING,
+            TaskStatus.PAUSED,
+        )
 
     def _block_invalidated(self, block_object):
         if block_object.is_destroyed():
             return
         binding = self._block_tasks.get(block_object.guid)
-        if binding is None:
+        if binding is None or not binding["active"]:
             return
         current_task = binding["engine_task"]
-        if current_task is not None and current_task.status in (
-            TaskStatus.QUEUED,
-            TaskStatus.RUNNING,
-            TaskStatus.PAUSED,
-        ):
+        if self._task_is_active(current_task):
             binding["pending"] = True
             return
         self._enqueue_block_process(binding)
 
     def _block_task_finished(self, binding, task):
+        if not binding["active"]:
+            return
         if binding["on_finished"] is not None:
             binding["on_finished"](task)
         binding["engine_task"] = None
         if (
+            task.status is TaskStatus.COMPLETED
+            and
             not binding["task"].block_object.is_destroyed()
             and (binding["pending"] or not binding["task"].block_object.is_valid())
         ):
@@ -236,7 +265,7 @@ class EngineTaskModel(QObject):
 
     def _resume_waiting_parents(self):
         for binding in tuple(self._block_tasks.values()):
-            if binding["waiting_for_children"]:
+            if binding["active"] and binding["waiting_for_children"]:
                 self._enqueue_block_process(binding)
 
     def play(self):

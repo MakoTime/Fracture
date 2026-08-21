@@ -9,8 +9,10 @@ class BlockObject(ABC):
         self.comments = comments
         self._valid = True
         self._invalidation_callbacks = []
+        self._change_callbacks = []
         self._destruction_callbacks = []
         self._parent_block_objects = []
+        self._change_parent_block_objects = []
         self._child_block_objects = []
         self._parent_dependencies = {}
         self._child_dependencies = {}
@@ -20,15 +22,44 @@ class BlockObject(ABC):
         """Hash blocks by their stable project GUID."""
         return hash(self.guid)
         
-    def invalidate(self):
+    def invalidate(self, force=False):
         """Mark the block invalid and notify any task manager watching it."""
-        if not self._valid:
+        self._invalidate(set(), force=force)
+
+    def _invalidate(self, visited, force=False):
+        if self in visited:
+            return
+        visited.add(self)
+        if not force and not self._valid:
             return
         self._valid = False
         for callback in tuple(self._invalidation_callbacks):
             callback(self)
         for parent in tuple(self._parent_block_objects):
-            parent.invalidate()
+            parent._invalidate(visited, force=force)
+
+    def mark_changed(self):
+        """Invalidate this block and every parent that consumes it."""
+        if self._destroyed:
+            return False
+        self._mark_changed({})
+        return True
+
+    def _mark_changed(self, visited, invalidates=True):
+        previous = visited.get(self, False)
+        if self in visited and (previous or not invalidates):
+            return
+        visited[self] = previous or invalidates
+        if invalidates:
+            self._valid = False
+            for callback in tuple(self._invalidation_callbacks):
+                callback(self)
+        for callback in tuple(self._change_callbacks):
+            callback(self)
+        for parent in tuple(self._parent_block_objects):
+            parent._mark_changed(visited, invalidates=True)
+        for parent in tuple(self._change_parent_block_objects):
+            parent._mark_changed(visited, invalidates=False)
 
     def add_parent_block_object(self, parent, dependent=False):
         """Register a parent and whether it depends on this block's lifetime."""
@@ -58,6 +89,16 @@ class BlockObject(ABC):
         """Remove a child dependency from this block."""
         child.remove_parent_block_object(self)
 
+    def add_change_child_block_object(self, child):
+        """Register a child whose changes update this block without scheduling it."""
+        if self not in child._change_parent_block_objects:
+            child._change_parent_block_objects.append(self)
+
+    def remove_change_child_block_object(self, child):
+        """Remove a change-only child relationship."""
+        if self in child._change_parent_block_objects:
+            child._change_parent_block_objects.remove(self)
+
     @property
     def child_block_objects(self):
         return tuple(self._child_block_objects)
@@ -73,10 +114,25 @@ class BlockObject(ABC):
         if callback not in self._invalidation_callbacks:
             self._invalidation_callbacks.append(callback)
 
+    def add_change_callback(self, callback):
+        """Register a callback invoked for explicit block changes."""
+        if callback not in self._change_callbacks:
+            self._change_callbacks.append(callback)
+
+    def remove_change_callback(self, callback):
+        """Stop notifying a callback about explicit block changes."""
+        if callback in self._change_callbacks:
+            self._change_callbacks.remove(callback)
+
     def add_destruction_callback(self, callback):
         """Register a callback invoked when this block is destroyed."""
         if callback not in self._destruction_callbacks:
             self._destruction_callbacks.append(callback)
+
+    def remove_destruction_callback(self, callback):
+        """Stop notifying a callback when this block is destroyed."""
+        if callback in self._destruction_callbacks:
+            self._destruction_callbacks.remove(callback)
 
     def destroy(self):
         """Destroy this block and dependent parents exactly once."""
@@ -100,6 +156,7 @@ class BlockObject(ABC):
     def _on_child_destroyed(self, child, dependent=False):
         """Handle a child lifetime ending."""
         del child
+        self.mark_changed()
         if dependent:
             self.destroy()
 

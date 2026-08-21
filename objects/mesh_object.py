@@ -39,7 +39,7 @@ class MeshObject(ObjectBase):
 
         super().__init__(
             name=name,
-            icon=icon if icon is not None else get_icon("grid"),
+            icon=icon if icon is not None else get_icon("shape_cube"),
             visible=visible,
             scene_data=None,
             metadata={
@@ -116,7 +116,7 @@ class MeshObject(ObjectBase):
 
     def set_colourmap(self, colourmap):
         return self.mesh_block_object.set_colourmap(
-            getattr(colourmap, "block_object", colourmap)
+            getattr(colourmap, "block_object", colourmap),
         )
 
     @property

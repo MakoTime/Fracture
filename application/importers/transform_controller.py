@@ -13,6 +13,7 @@ from dialog.perlin_noise_transform import (
 from engine.block_tasks import PerlinNoiseTransformTask
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from tools.dropdown import create_dropdown_menu
+from common.icons import get_icon
 
 
 class TransformController:
@@ -77,7 +78,7 @@ class TransformController:
             options.extend(
                 (
                     ("Edit", lambda: self.edit(node.node_object)),
-                    ("Delete", lambda: self.delete(node.node_object)),
+                    ("Delete", lambda: self.delete(node.node_object), get_icon("bin")),
                 )
             )
         return create_dropdown_menu(options, parent)
@@ -104,22 +105,25 @@ class TransformController:
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
         updated = dialog.update_model()
-        for field_name in (
-            "frequencies",
-            "amplitudes",
-            "seed",
-            "curve_mode",
-            "curve_points",
-            "curve_handles",
-            "frequency_start",
-            "frequency_end",
-            "sample_count",
-            "manual_sampling",
-            "preset",
-            "preset_options",
-        ):
-            setattr(block, field_name, getattr(updated, field_name))
-        block.invalidate()
+        block.update_configuration(
+            **{
+                field_name: getattr(updated, field_name)
+                for field_name in (
+                    "frequencies",
+                    "amplitudes",
+                    "seed",
+                    "curve_mode",
+                    "curve_points",
+                    "curve_handles",
+                    "frequency_start",
+                    "frequency_end",
+                    "sample_count",
+                    "manual_sampling",
+                    "preset",
+                    "preset_options",
+                )
+            }
+        )
         transform._on_name_changed(updated.name.strip() or transform.name)
         self._enqueue_task(transform)
         self._refresh_and_select(transform)
@@ -138,10 +142,19 @@ class TransformController:
     def _enqueue_task(self, transform):
         if self.engine_runner is None:
             return None
-        return self.engine_runner.enqueue_block_task(
-            f"Generate {transform.name}",
-            PerlinNoiseTransformTask(transform.block_object),
-        )
+        task = PerlinNoiseTransformTask(transform.block_object)
+        if hasattr(self.engine_runner, "task_model"):
+            return self.engine_runner.enqueue_block_task(
+                f"Generate {transform.name}",
+                task,
+                on_finished=lambda finished: self._finish_task(transform, finished),
+            )
+        return self.engine_runner.enqueue_block_task(f"Generate {transform.name}", task)
+
+    def _finish_task(self, transform, task):
+        if task.error:
+            return
+        self.object_importer.refresh_object(transform)
 
     def _remove_task(self, block):
         if self.engine_runner is not None and hasattr(

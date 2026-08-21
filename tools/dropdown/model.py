@@ -9,6 +9,7 @@ class DropdownOption:
     label: str
     value: Any = None
     enabled: bool = True
+    icon: Any = None
 
     def __post_init__(self):
         if self.value is None:

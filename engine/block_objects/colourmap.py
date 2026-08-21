@@ -65,9 +65,8 @@ class ColourmapBlockObject(BlockObject):
             )
         self.noise_enabled = bool(self.noise_enabled)
         if self.perlin_noise_transform is not None:
-            self.add_child_block_object(
-                self.perlin_noise_transform,
-                dependent=False,
+            self.perlin_noise_transform.add_destruction_callback(
+                self._on_noise_transform_destroyed
             )
 
     @staticmethod
@@ -156,10 +155,42 @@ class ColourmapBlockObject(BlockObject):
         self.prepare()
         if progress_callback:
             progress_callback(1.0)
+        self.validate()
+        return self
+
+    def update_from(self, source):
+        for name in (
+            "stops",
+            "field1_name",
+            "field2_name",
+            "field1_positions",
+            "field2_positions",
+            "colour_grid",
+            "field1_curve_points",
+            "field1_curve_handles",
+            "field2_curve_points",
+            "field2_curve_handles",
+            "noise_enabled",
+        ):
+            setattr(self, name, getattr(source, name))
+        self.stops = self._normalize_stops(self.stops)
+        self.field1_positions = self._normalize_positions(self.field1_positions)
+        self.field2_positions = self._normalize_positions(self.field2_positions)
+        self.colour_grid = self._normalize_grid(self.colour_grid)
+        self.field1_curve_points = self._normalize_curve_points(self.field1_curve_points)
+        self.field1_curve_handles = self._normalize_curve_handles(self.field1_curve_handles)
+        self.field2_curve_points = self._normalize_curve_points(self.field2_curve_points)
+        self.field2_curve_handles = self._normalize_curve_handles(self.field2_curve_handles)
+        self.set_perlin_noise_transform(
+            getattr(source.perlin_noise_transform, "block_object", source.perlin_noise_transform)
+        )
+        self.prepare()
+        self.process()
+        self.mark_changed()
         return self
 
     def set_perlin_noise_transform(self, transform):
-        """Replace the optional dependent noise transform."""
+        """Replace the optional noise transform configuration reference."""
         if transform is not None and not isinstance(
             transform,
             PerlinNoiseTransformBlockObject,
@@ -168,24 +199,34 @@ class ColourmapBlockObject(BlockObject):
                 "perlin_noise_transform must be a "
                 "PerlinNoiseTransformBlockObject"
             )
+        if self.perlin_noise_transform is transform:
+            return transform
         if self.perlin_noise_transform is not None:
-            self.remove_child_block_object(self.perlin_noise_transform)
+            self.perlin_noise_transform.remove_destruction_callback(
+                self._on_noise_transform_destroyed
+            )
         self.perlin_noise_transform = transform
         if transform is not None:
-            self.add_child_block_object(transform, dependent=False)
+            transform.add_destruction_callback(self._on_noise_transform_destroyed)
+        self.mark_changed()
         return transform
+
+    def _on_noise_transform_destroyed(self, transform):
+        if transform is not self.perlin_noise_transform:
+            return
+        self.perlin_noise_transform = None
+        self.noise_enabled = False
+        self.mark_changed()
 
     def _on_child_destroyed(self, child, dependent=False):
         if child is self.perlin_noise_transform:
-            self.perlin_noise_transform = None
-            self.noise_enabled = False
-            self.remove_child_block_object(child)
-            self.invalidate()
+            self._on_noise_transform_destroyed(child)
             return
         super()._on_child_destroyed(child, dependent=dependent)
 
     def apply(self, values, skip_noise=False):
         """Map scalar values to interpolated RGBA colours."""
+        self.process()
         scalar_values = np.asarray(values, dtype=float)
         if (
             not skip_noise
@@ -209,6 +250,7 @@ class ColourmapBlockObject(BlockObject):
 
     def apply_fields(self, field1, field2):
         """Sample the authored two-dimensional colour field at normalized inputs."""
+        self.process()
         first = np.clip(np.asarray(field1, dtype=float), 0.0, 1.0)
         second = np.clip(np.asarray(field2, dtype=float), 0.0, 1.0)
         if first.shape != second.shape:

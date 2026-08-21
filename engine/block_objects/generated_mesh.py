@@ -31,8 +31,10 @@ class GeneratedMeshBlockObject(MeshBlockObject):
                 "perlin_noise_transform must be a PerlinNoiseTransformBlockObject"
             )
         self.perlin_noise_transform = perlin_noise_transform
-        if perlin_noise_transform is not None:
-            self.add_child_block_object(perlin_noise_transform, dependent=True)
+        if self.perlin_noise_transform is not None:
+            self.perlin_noise_transform.add_destruction_callback(
+                self._on_noise_transform_destroyed
+            )
 
     def set_perlin_noise_transform(self, transform):
         if transform is not None and not isinstance(
@@ -41,21 +43,24 @@ class GeneratedMeshBlockObject(MeshBlockObject):
             raise TypeError(
                 "perlin_noise_transform must be a PerlinNoiseTransformBlockObject"
             )
+        if self.perlin_noise_transform is transform:
+            return transform
         if self.perlin_noise_transform is not None:
-            self.remove_child_block_object(self.perlin_noise_transform)
+            self.perlin_noise_transform.remove_destruction_callback(
+                self._on_noise_transform_destroyed
+            )
         self.perlin_noise_transform = transform
         if transform is not None:
-            self.add_child_block_object(transform, dependent=True)
+            transform.add_destruction_callback(self._on_noise_transform_destroyed)
+        self.mark_changed()
         return transform
 
-    def _on_child_destroyed(self, child, dependent=False):
-        if child is self.perlin_noise_transform:
-            self.perlin_noise_transform = None
-            self.noise_enabled = False
-            self.remove_child_block_object(child)
-            self.invalidate()
+    def _on_noise_transform_destroyed(self, transform):
+        if transform is not self.perlin_noise_transform:
             return
-        super()._on_child_destroyed(child, dependent=dependent)
+        self.perlin_noise_transform = None
+        self.noise_enabled = False
+        self.mark_changed()
 
     @staticmethod
     def _validate_grid_data(grid_data):

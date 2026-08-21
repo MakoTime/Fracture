@@ -4,6 +4,8 @@ from enum import Enum
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QIcon
 
+from common.icons import get_icon
+
 
 class BaseColumn(Enum):
     Name = 0
@@ -99,6 +101,18 @@ class TableModel(QAbstractTableModel):
                 return self.remove_row(row)
         return False
 
+    def refresh_object(self, object_base):
+        """Notify views that a registered object's block data changed."""
+        for row, row_data in enumerate(self.table_manager.get_data()):
+            if row_data.obj.obj is not object_base:
+                continue
+            self.dataChanged.emit(
+                self.index(row, 0),
+                self.index(row, self.columnCount() - 1),
+            )
+            return True
+        return False
+
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
             return None
@@ -115,8 +129,11 @@ class TableModel(QAbstractTableModel):
                 return row_data.other
             if column == self.REMOVE:
                 return "Remove"
-        elif role == Qt.DecorationRole and column == self.OBJECT:
-            return row_data.obj.icon
+        elif role == Qt.DecorationRole:
+            if column == self.OBJECT:
+                return row_data.obj.icon
+            if column == self.REMOVE:
+                return get_icon("bin")
         return None
 
     def flags(self, index):

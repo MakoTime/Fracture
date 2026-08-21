@@ -11,7 +11,9 @@ def _icon(filename: str) -> QIcon:
 
 
 ALERT_OCTAGON_ICON = _icon("alert_octagon.svg")
+BIN_ICON = _icon("bin.svg")
 BLOOD_DROP_ICON = _icon("blood_drop.svg")
+COLOUR_PALETTE_ICON = _icon("colour_palette.svg")
 DASHBOARD_WARNING_ICON = _icon("dashboard_warning.svg")
 FOLDER_ICON = _icon("folder.svg")
 FOLDER_COLLAPSED_ICON = _icon("folder_collapsed.svg")
@@ -32,11 +34,15 @@ RAIN_UMBRELLA_ICON = _icon("rain_umbrella.svg")
 SAVE_ICON = _icon("save.svg")
 VISIBLE_ICON = _icon("visible.svg")
 INVISIBLE_ICON = _icon("invisible.svg")
+PHOTO_CHANGED_FILTER_ICON = _icon("photo_changed_filter.svg")
+SHAPE_CUBE_ICON = _icon("shape_cube.svg")
 
 
 ICONS = {
 	"alert_octagon": ALERT_OCTAGON_ICON,
+	"bin": BIN_ICON,
 	"blood_drop": BLOOD_DROP_ICON,
+	"colour_palette": COLOUR_PALETTE_ICON,
 	"dashboard_warning": DASHBOARD_WARNING_ICON,
 	"folder": FOLDER_ICON,
 	"folder_collapsed": FOLDER_COLLAPSED_ICON,
@@ -57,6 +63,8 @@ ICONS = {
 	"save": SAVE_ICON,
 	"visible": VISIBLE_ICON,
 	"invisible": INVISIBLE_ICON,
+	"photo_changed_filter": PHOTO_CHANGED_FILTER_ICON,
+	"shape_cube": SHAPE_CUBE_ICON,
 }
 
 

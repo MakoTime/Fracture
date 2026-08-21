@@ -235,9 +235,8 @@ def test_project_round_trip_restores_block_child_references(tmp_path):
     mesh_item = next(
         item for item in saved["objects"] if item["guid"] == mesh.guid
     )
-    assert mesh_item["child_references"] == [
-        {"guid": transform.guid, "dependent": True}
-    ]
+    assert mesh_item["child_references"] == []
+    assert mesh_item["transform_reference"] == transform.guid
 
     ProjectSerializer().load(
         project_file,
@@ -252,8 +251,8 @@ def test_project_round_trip_restores_block_child_references(tmp_path):
     assert isinstance(restored.block_object, GeneratedMeshBlockObject)
     assert isinstance(restored_transform.block_object, PerlinNoiseTransformBlockObject)
     assert restored.block_object.perlin_noise_transform is restored_transform.block_object
-    assert restored.block_object.child_block_objects == (restored_transform.block_object,)
-    assert restored.block_object._child_dependencies[restored_transform.block_object]
+    assert restored.block_object.child_block_objects == ()
+    assert restored_transform.block_object not in restored.block_object._child_dependencies
 
 
 def test_project_round_trip_restores_colourmap_noise_transform(tmp_path):
@@ -290,8 +289,7 @@ def test_project_round_trip_restores_colourmap_noise_transform(tmp_path):
         restored.block_object.perlin_noise_transform
         is restored_transform.block_object
     )
-    assert restored_transform.block_object in restored.block_object.child_block_objects
-    assert restored.block_object._child_dependencies[restored_transform.block_object] is False
+    assert restored_transform.block_object not in restored.block_object.child_block_objects
 
 
 def test_processed_block_can_be_persisted_and_released(tmp_path):

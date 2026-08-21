@@ -24,6 +24,7 @@ from application.importers import MeshImportController, ObjectImporterModel
 from application.importers import TransformController
 from application.importers import ColourmapController
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
+from dialog.mesh_filter import MeshFilterModel
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from objects.object_base import ObjectBase
 
@@ -616,11 +617,93 @@ def test_generated_mesh_menu_includes_edit_generation_action(qapp):
 
     assert [action.text() for action in menu.actions()] == [
         "Edit Generation",
+        "Filter Mesh",
         "Edit Colourmap",
         "Edit Mesh",
         "Show in scene",
         "Delete",
     ]
+
+
+def test_mesh_filter_requires_an_explicit_transform():
+    source = GeneratedMesh(
+        "Source",
+        grid_data=np.random.default_rng(4).random((4, 4, 4)),
+    )
+    model = MeshFilterModel.from_mesh(source)
+
+    assert model.perlin_noise_transform is None
+    assert model.filter_enabled is False
+    try:
+        model.generate()
+    except ValueError as error:
+        assert "transform" in str(error)
+    else:
+        raise AssertionError("a filter without a transform should be rejected")
+
+
+def test_mesh_filter_returns_regular_mesh_with_baked_dependencies():
+    source = GeneratedMesh(
+        "Source",
+        grid_data=np.random.default_rng(4).random((8, 8, 8)),
+    )
+    transform = _perlin_transform(size=4)
+    model = MeshFilterModel.from_mesh(source)
+    model.perlin_noise_transform = transform
+    model.noise_enabled = True
+
+    filtered = model.generate()
+
+    assert isinstance(filtered, MeshObject)
+    assert type(filtered.mesh_block_object).__name__ == "MeshBlockObject"
+    assert not isinstance(filtered, GeneratedMesh)
+    assert filtered.mesh_block_object.child_block_objects == (
+        transform.block_object,
+        source.mesh_block_object,
+    )
+
+
+def test_mesh_filter_uses_source_transform_without_invalidating_source_mesh():
+    transform = _perlin_transform(size=4)
+    source = GeneratedMesh(
+        "Source",
+        grid_data=np.random.default_rng(5).random((8, 8, 8)),
+        block_object=GeneratedMeshBlockObject(
+            name="Source",
+            grid_data=np.random.default_rng(5).random((8, 8, 8)),
+            perlin_noise_transform=transform.block_object,
+        ),
+    )
+    model = MeshFilterModel.from_mesh(source)
+    model.perlin_noise_transform = transform
+    model.noise_enabled = True
+
+    filtered = model.generate()
+
+    assert filtered.mesh_block_object.child_block_objects == (
+        transform.block_object,
+        source.mesh_block_object,
+    )
+    source.mesh_block_object.validate()
+    filtered.mesh_block_object.validate()
+    transform.block_object.invalidate(force=True)
+
+    assert source.mesh_block_object.is_valid()
+    assert not filtered.mesh_block_object.is_valid()
+
+
+def test_generated_mesh_transform_setter_does_not_reinvalidate_same_transform():
+    transform = _perlin_transform(size=4)
+    block = GeneratedMeshBlockObject(
+        name="Source",
+        grid_data=np.ones((4, 4, 4)),
+        perlin_noise_transform=transform.block_object,
+    )
+    block.validate()
+
+    assert block.set_perlin_noise_transform(transform.block_object) is transform.block_object
+    assert block.is_valid()
+    assert transform.block_object not in block.child_block_objects
 
 
 def test_generated_mesh_generation_settings_can_reopen():

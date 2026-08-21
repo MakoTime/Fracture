@@ -1,29 +1,31 @@
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
+    QMainWindow,
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
-    QLabel,
     QHBoxLayout,
+    QSplitter,
     QVBoxLayout,
     QWidget,
+    QTabWidget,
 )
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 
 from components.scene import SceneViewer
 from .model import MeshColourmapModel
 
 
-class MeshColourmapView(QDialog):
+class MeshColourmapView(QMainWindow):
     """Choose a mesh colourmap and map its two fields to mesh values."""
 
-    def __init__(self, model, colourmaps=(), parent=None):
+    def __init__(self, model, colourmaps=(), parent=None, on_apply=None):
         super().__init__(parent)
         self.model = model
+        self._on_apply = on_apply
         self.setWindowTitle("Configure Mesh Colourmap")
-        self.resize(760, 500)
+        self.resize(900, 560)
 
         self.colourmap = QComboBox()
         self.colourmap.addItem("None", None)
@@ -56,32 +58,39 @@ class MeshColourmapView(QDialog):
         form.addRow("Colourmap", self.colourmap)
         form.addRow("Field 1", field1_row)
         form.addRow("Field 2", field2_row)
-        form.addRow(
-            QLabel("Inputs are normalized before colourmap sampling."),
-            QLabel(),
-        )
-        settings_group = QGroupBox("Colourmap settings")
+        settings_group = QGroupBox("Colourmap")
         settings_group.setLayout(form)
 
-        preview_group = QGroupBox("Mesh preview")
-        preview_layout = QVBoxLayout(preview_group)
-        preview_layout.addWidget(self._preview_host)
-
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.Apply
+            | QDialogButtonBox.StandardButton.Ok
         )
-        buttons.accepted.connect(self._accept)
-        buttons.rejected.connect(self.reject)
+        buttons.rejected.connect(self._cancel)
+        buttons.clicked.connect(self._button_clicked)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 10)
-        layout.setSpacing(8)
-        content = QHBoxLayout()
-        content.addWidget(settings_group, 0)
-        content.addWidget(preview_group, 1)
-        layout.addLayout(content, 1)
+        left_panel = QWidget()
+        left_panel.setMinimumWidth(220)
+        left_panel.setMaximumWidth(500)
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(settings_group)
+        left_layout.addStretch(1)
+
+        top = QSplitter(Qt.Orientation.Horizontal)
+        top.addWidget(left_panel)
+        top.addWidget(self._preview_host)
+        top.setChildrenCollapsible(False)
+        top.setStretchFactor(0, 0)
+        top.setStretchFactor(1, 1)
+        top.setSizes([260, 640])
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.addWidget(top)
         layout.addWidget(buttons)
+        self.setCentralWidget(content)
         self._set_model()
         QTimer.singleShot(0, self._initialize_preview)
 
@@ -108,9 +117,20 @@ class MeshColourmapView(QDialog):
             return
         self.update_model()
         self.preview.clear_scene()
-        preview_object = self.model.preview_object()
-        if preview_object is not None:
-            self.preview.add_object(preview_object)
+        preview_data = self.model.preview_data()
+        if preview_data is None:
+            return
+        self.preview.plotter.add_mesh(
+            preview_data,
+            scalars=(
+                "__colourmap_rgba"
+                if "__colourmap_rgba" in preview_data.point_data
+                else None
+            ),
+            rgb="__colourmap_rgba" in preview_data.point_data,
+            reset_camera=True,
+        )
+        self.preview.plotter.render()
 
     def _set_combo_data(self, combo, value):
         index = combo.findData(value)
@@ -131,6 +151,36 @@ class MeshColourmapView(QDialog):
         self.model.invert_field2 = self.invert_field2.isChecked()
         return self.model
 
-    def _accept(self):
+    def _button_clicked(self, button):
+        role = self.sender().buttonRole(button)
+        if role in (
+            QDialogButtonBox.ButtonRole.ApplyRole,
+            QDialogButtonBox.ButtonRole.AcceptRole,
+        ):
+            self._apply()
+        if role == QDialogButtonBox.ButtonRole.AcceptRole:
+            self.close()
+
+    def _apply(self):
         self.update_model()
-        self.accept()
+        if self._on_apply is not None:
+            self._on_apply(self.model)
+        return self.model
+
+    def _cancel(self):
+        self.close()
+
+    def closeEvent(self, event):
+        window = self.parentWidget()
+        while window is not None and window.parentWidget() is not None:
+            window = window.parentWidget()
+        tabs = (
+            window.findChild(QTabWidget, "workspaceTabs")
+            if window is not None
+            else None
+        )
+        if tabs is not None:
+            index = tabs.indexOf(self)
+            if index >= 0:
+                tabs.removeTab(index)
+        super().closeEvent(event)

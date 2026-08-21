@@ -38,15 +38,18 @@ class MeshGenerateTask:
         self.block_object.noise_enabled = self._noise_is_active()
         report(0.35)
         isovalues = self._contour_levels()
-        self.block_object.mesh_data = self._build_surface_mesh(
+        self.block_object.set_mesh_data(self._build_surface_mesh(
             self.grid_data,
             isovalue=isovalues,
-        )
-        if self._noise_is_active():
-            self.block_object.mask_mesh_data = self._build_surface_mesh(
+        ))
+        if self._noise_is_active() and getattr(
+            self.model, "show_mask_surface", True
+        ):
+            self.block_object.set_mask_mesh_data(self._build_surface_mesh(
                 base_grid_data,
                 isovalue=self._mask_contour_level(),
-            )
+            ))
+        self.block_object.process()
         report(1.0)
         return self.block_object
 
@@ -66,6 +69,8 @@ class MeshGenerateTask:
             surface_mask = active_mask & (field != 0.0)
         if apply_noise and self._noise_is_active():
             transform = self.block_object.perlin_noise_transform
+            transform.prepare()
+            transform.process()
             noise = transform.noise_field(dimensions)
             penetration = max(1, int(self.model.noise_penetration))
             contour_level = self._contour_levels()[0]

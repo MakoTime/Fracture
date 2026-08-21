@@ -32,26 +32,40 @@ class MeshBlockObject(BlockObject):
     def __post_init__(self):
         BlockObject.__init__(self, self.name, self.guid, self.comments)
         if self.colourmap is not None:
-            self.set_colourmap(self.colourmap)
+            self.set_colourmap(self.colourmap, notify=False)
 
-    def set_colourmap(self, colourmap):
+    def set_colourmap(self, colourmap, notify=True):
         if colourmap is not None and not isinstance(colourmap, ColourmapBlockObject):
             raise TypeError("colourmap must be a ColourmapBlockObject")
         if self.colourmap is not None:
-            self.remove_child_block_object(self.colourmap)
+            self.remove_change_child_block_object(self.colourmap)
+            self.colourmap.remove_destruction_callback(
+                self._on_colourmap_destroyed
+            )
         self.colourmap = colourmap
         if colourmap is not None:
-            self.add_child_block_object(colourmap, dependent=False)
+            self.add_change_child_block_object(colourmap)
+            colourmap.add_destruction_callback(self._on_colourmap_destroyed)
+        if notify:
+            self.mark_changed()
         return colourmap
+
+    def _on_colourmap_destroyed(self, colourmap):
+        if colourmap is not self.colourmap:
+            return
+        self.colourmap = None
+        self._mark_changed({}, invalidates=False)
 
     def set_colourmap_field_sources(self, field1_source, field2_source):
         self.colourmap_field_sources = (str(field1_source), str(field2_source))
+        self.mark_changed()
 
     def set_colourmap_data_options(self, invert_field1, invert_field2):
         self.colourmap_field_inversions = (
             bool(invert_field1),
             bool(invert_field2),
         )
+        self.mark_changed()
 
     BITMAP_EXTENSIONS = {".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
@@ -64,7 +78,16 @@ class MeshBlockObject(BlockObject):
         self.prepare()
         if progress_callback:
             progress_callback(1.0)
+        self.validate()
         return self
+
+    def set_mesh_data(self, mesh_data):
+        self.mesh_data = mesh_data
+        return mesh_data
+
+    def set_mask_mesh_data(self, mesh_data):
+        self.mask_mesh_data = mesh_data
+        return mesh_data
 
     def serialise(self, path):
         """Save the processed mesh payload to a project block-data file."""

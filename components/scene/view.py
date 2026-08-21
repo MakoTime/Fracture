@@ -77,11 +77,13 @@ class SceneViewer(QWidget):
             self._pan_active = False
             self._pan_anchor = None
             self._end_terrain_gesture()
+            self._reset_clipping_range()
             self.plotter.render()
             return True
 
         if event.type() == QEvent.Type.MouseButtonRelease:
             self._end_terrain_gesture()
+            self._reset_clipping_range()
             self.plotter.render()
         return super().eventFilter(watched, event)
 
@@ -92,10 +94,12 @@ class SceneViewer(QWidget):
     def reset_camera(self):
         """Fit all visible scene data in the render window."""
         self.plotter.reset_camera()
-        self.plotter.camera.SetClippingRange(
-            0.01, self.sky_dome.radius * 2.0
-        )
+        self._reset_clipping_range()
         self.plotter.render()
+
+    def _reset_clipping_range(self):
+        """Recompute depth clipping from the current rendered scene bounds."""
+        self.plotter.renderer.ResetCameraClippingRange()
 
     def zoom_camera(self, factor):
         """Zoom the current camera, where values below one zoom out."""
@@ -111,6 +115,7 @@ class SceneViewer(QWidget):
             camera.SetPosition(
                 tuple(focal_point + (position - focal_point) / factor)
             )
+        self._reset_clipping_range()
         self.plotter.render()
 
     def _zoom_camera_from_wheel(self, delta):
@@ -141,6 +146,7 @@ class SceneViewer(QWidget):
 
     def _render_pan_frame(self):
         self._pan_render_pending = False
+        self._reset_clipping_range()
         self.plotter.render()
 
     def _display_delta_to_world(self, delta):
@@ -188,7 +194,7 @@ class SceneViewer(QWidget):
                 inplace=False,
             )
             if block_object is not None:
-                block_object.mesh_data = payload
+                block_object.set_mesh_data(payload)
 
         if hasattr(payload, "compute_normals") and "Normals" not in payload.point_data:
             payload = payload.compute_normals(
@@ -197,7 +203,7 @@ class SceneViewer(QWidget):
                 inplace=False,
             )
             if block_object is not None:
-                block_object.mesh_data = payload
+                block_object.set_mesh_data(payload)
 
         colour_scalars = None
         colourmap = getattr(block_object, "colourmap", None)
@@ -257,6 +263,10 @@ class SceneViewer(QWidget):
 
     def refresh_object_colourmap(self, object_base):
         """Rebuild an object's actor after its optional colourmap changes."""
+        return self.refresh_object(object_base)
+
+    def refresh_object(self, object_base):
+        """Rebuild an existing actor from the object's current block data."""
         if object_base not in self._actors:
             return False
         camera_position = self.plotter.camera_position
@@ -294,3 +304,4 @@ class SceneViewer(QWidget):
         self.scene_model.clear()
         self.plotter.show_axes()
         self.plotter.render()
+

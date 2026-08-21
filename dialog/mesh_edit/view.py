@@ -97,6 +97,14 @@ class MeshEditView(QDialog):
             ),
             None,
         )
+        def apply_colourmap(model):
+            self.model.colourmap = model.colourmap
+            self.model.colourmap_field_sources = (
+                model.field1_source,
+                model.field2_source,
+            )
+            self._update_colourmap_label()
+
         dialog = create_mesh_colourmap_dialog(
             MeshColourmapModel(
                 mesh_object=self.model.mesh_object,
@@ -108,16 +116,9 @@ class MeshEditView(QDialog):
             ),
             colourmaps=self._colourmaps,
             parent=self,
+            on_apply=apply_colourmap,
         )
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        configured = dialog.update_model()
-        self.model.colourmap = configured.colourmap
-        self.model.colourmap_field_sources = (
-            configured.field1_source,
-            configured.field2_source,
-        )
-        self._update_colourmap_label()
+        dialog.show()
 
     def _update_colourmap_label(self):
         name = getattr(self.model.colourmap, "name", "None")

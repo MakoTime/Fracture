@@ -49,7 +49,48 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
         if any(value < 0.0 for value in self.amplitudes):
             raise ValueError("amplitudes must be non-negative")
 
+    def prepare(self):
+        if not self.frequencies or len(self.frequencies) != len(self.amplitudes):
+            raise ValueError("frequencies and amplitudes must have equal lengths")
+        if any(value < 1 for value in self.frequencies):
+            raise ValueError("frequencies must contain positive integers")
+        if any(value < 0.0 for value in self.amplitudes):
+            raise ValueError("amplitudes must be non-negative")
+        if self.curve_mode not in ("discrete", "bezier"):
+            raise ValueError("curve_mode must be discrete or bezier")
+        if self.frequency_start >= self.frequency_end:
+            raise ValueError("frequency_start must be below frequency_end")
+        return self
+
+    def update_configuration(self, **values):
+        allowed = {
+            "frequencies",
+            "amplitudes",
+            "seed",
+            "curve_mode",
+            "curve_points",
+            "curve_handles",
+            "frequency_start",
+            "frequency_end",
+            "sample_count",
+            "manual_sampling",
+            "preset",
+            "preset_options",
+        }
+        unknown = set(values) - allowed
+        if unknown:
+            raise TypeError(f"Unknown transform settings: {sorted(unknown)}")
+        for name, value in values.items():
+            setattr(self, name, value)
+        self.frequencies = tuple(int(value) for value in self.frequencies)
+        self.amplitudes = tuple(float(value) for value in self.amplitudes)
+        self.prepare()
+        self.process()
+        self.mark_changed()
+        return self
+
     def apply(self, values):
+        self.process()
         field = np.asarray(values, dtype=float)
         if field.ndim != 3:
             raise ValueError("Perlin transforms require a three-dimensional field")
@@ -106,6 +147,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
 
     def noise_field(self, dimensions):
         """Build a normalized field from this transform's frequency bands."""
+        self.process()
         dimensions = tuple(max(1, int(value)) for value in dimensions)
         total_amplitude = sum(self.amplitudes)
         if total_amplitude == 0.0:

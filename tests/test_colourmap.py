@@ -1,5 +1,7 @@
 import numpy as np
+import pyvista as pv
 import pytest
+from types import SimpleNamespace
 
 from components.tree import TreeManager
 from components.tree import TreeSearch
@@ -67,7 +69,47 @@ def test_mesh_block_can_attach_a_colourmap():
     mesh.set_colourmap(colourmap)
 
     assert mesh.colourmap is colourmap
-    assert colourmap in mesh.child_block_objects
+    assert colourmap not in mesh.child_block_objects
+
+
+def test_destroying_mesh_colourmap_detaches_without_invalidating_parent_mesh():
+    colourmap = ColourmapBlockObject()
+    mesh = MeshBlockObject(colourmap=colourmap)
+
+    colourmap.destroy()
+
+    assert not mesh.is_destroyed()
+    assert mesh.colourmap is None
+    assert mesh.is_valid()
+
+
+def test_changing_child_colourmap_notifies_but_does_not_invalidate_parent_mesh():
+    colourmap = ColourmapBlockObject()
+    mesh = MeshBlockObject(colourmap=colourmap)
+    mesh.validate()
+    colourmap.validate()
+
+    colourmap.mark_changed()
+
+    assert not colourmap.is_valid()
+    assert mesh.is_valid()
+
+
+def test_destroying_colourmap_noise_invalidates_mesh_even_if_already_invalid():
+    noise = PerlinNoiseTransformBlockObject()
+    colourmap = ColourmapBlockObject(perlin_noise_transform=noise)
+    mesh = MeshBlockObject(colourmap=colourmap)
+    mesh.validate()
+    colourmap.validate()
+    noise.validate()
+
+    colourmap.mark_changed()
+    noise.destroy()
+
+    assert colourmap.perlin_noise_transform is None
+    assert not colourmap.noise_enabled
+    assert not colourmap.is_valid()
+    assert mesh.is_valid()
 
 
 def test_mesh_colourmap_model_applies_field_sources():
@@ -86,6 +128,20 @@ def test_mesh_colourmap_model_applies_field_sources():
     assert mesh.colourmap is colourmap
     assert mesh.colourmap_field_sources == ("normal_z", "elevation")
     assert mesh.colourmap_field_inversions == (True, False)
+
+
+def test_mesh_colourmap_preview_data_is_decoupled_from_mesh():
+    mesh_data = pv.Plane(i_resolution=2, j_resolution=2)
+    colourmap = ColourmapBlockObject(name="Preview colours")
+    model = MeshColourmapModel(
+        mesh_object=SimpleNamespace(mesh_data=mesh_data),
+        colourmap=colourmap,
+    )
+
+    preview = model.preview_data()
+
+    assert preview is not mesh_data
+    assert "__colourmap_rgba" in preview.point_data
 
 
 def test_colourmap_block_round_trips_json(tmp_path):
@@ -148,8 +204,7 @@ def test_colourmap_can_apply_noise_from_a_perlin_child():
 
     assert noisy.shape == (2, 2, 2, 4)
     assert not np.allclose(noisy, plain)
-    assert transform in colourmap.child_block_objects
-    assert colourmap._child_dependencies[transform] is False
+    assert transform not in colourmap.child_block_objects
 
 
 def test_colourmap_noise_transform_can_be_removed():

@@ -24,11 +24,15 @@ def create_dropdown_menu(options: Iterable, parent: Optional[QWidget] = None) ->
             label = option.label
             callback = option.value
             enabled = option.enabled
+            icon = option.icon
         else:
-            label, callback = option
+            label, callback, *details = option
             enabled = True
+            icon = details[0] if details else None
         action = menu.addAction(label)
         action.setEnabled(enabled)
+        if icon is not None:
+            action.setIcon(icon)
         if callable(callback):
             action.triggered.connect(
                 lambda checked=False, callback=callback: callback()

@@ -26,6 +26,7 @@ class TransformBlockObject(BlockObject, ABC):
         self.prepare()
         if progress_callback:
             progress_callback(1.0)
+        self.validate()
         return self
 
     @abstractmethod

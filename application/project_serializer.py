@@ -59,6 +59,9 @@ class ProjectSerializer:
                 "in_scene": in_scene,
                 "parent_guid": self._parent_guid(node),
                 "child_references": self._child_references(block),
+                "colourmap_reference": (
+                    block.colourmap.guid if block.colourmap is not None else None
+                ),
                 "colourmap_field_sources": list(block.colourmap_field_sources),
                 "colourmap_field_inversions": list(block.colourmap_field_inversions),
                 "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
@@ -66,6 +69,10 @@ class ProjectSerializer:
             if isinstance(mesh_object, GeneratedMesh):
                 grid_path = block.grid_serialised_path
                 item["grid_data"] = f"{BLOCK_DATA_DIRECTORY}/{grid_path.name}"
+                transform = block.perlin_noise_transform
+                item["transform_reference"] = (
+                    transform.guid if transform is not None else None
+                )
             objects.append(item)
 
         for node in self._walk_nodes(transform_root):
@@ -104,8 +111,7 @@ class ProjectSerializer:
             block_path = colourmap.block_object.serialise(
                 block_directory / f"{colourmap.guid}.colourmap.json"
             )
-            objects.append(
-                {
+            item = {
                     "type": "colourmap",
                     "guid": colourmap.guid,
                     "name": colourmap.name,
@@ -117,7 +123,11 @@ class ProjectSerializer:
                     ),
                     "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
                 }
+            transform = colourmap.block_object.perlin_noise_transform
+            item["transform_reference"] = (
+                transform.guid if transform is not None else None
             )
+            objects.append(item)
 
         data = {"version": CURRENT_PROJECT_VERSION, "objects": objects}
         directory.mkdir(parents=True, exist_ok=True)
@@ -314,6 +324,31 @@ class ProjectSerializer:
                         child_block,
                         dependent=bool(reference.get("dependent", False)),
                     )
+            transform_guid = item.get("transform_reference")
+            if transform_guid is not None and isinstance(
+                parent_block,
+                (GeneratedMeshBlockObject, ColourmapBlockObject),
+            ):
+                transform = loaded.get(transform_guid)
+                transform_block = getattr(transform, "block_object", None)
+                if not isinstance(transform_block, PerlinNoiseTransformBlockObject):
+                    raise ValueError(
+                        f"Project contains an unresolved transform reference "
+                        f"{transform_guid}"
+                    )
+                parent_block.set_perlin_noise_transform(transform_block)
+            colourmap_guid = item.get("colourmap_reference")
+            if colourmap_guid is not None and isinstance(
+                parent_block, MeshBlockObject
+            ):
+                colourmap = loaded.get(colourmap_guid)
+                colourmap_block = getattr(colourmap, "block_object", None)
+                if not isinstance(colourmap_block, ColourmapBlockObject):
+                    raise ValueError(
+                        f"Project contains an unresolved colourmap reference "
+                        f"{colourmap_guid}"
+                    )
+                parent_block.set_colourmap(colourmap_block)
 
     @staticmethod
     def _restore_mesh_child_nodes(loaded):

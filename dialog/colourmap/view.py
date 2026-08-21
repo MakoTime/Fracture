@@ -25,6 +25,7 @@ from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from .graph import ColourmapPreview
 from .model import ColourmapModel
 from tools.widgets import BezierCurveGraph
+from common.icons import get_icon
 
 
 class ColourmapView(QDialog):
@@ -275,8 +276,8 @@ class ColourmapView(QDialog):
             menu.addAction("Insert column right"): lambda: self._insert_column(column + 1),
         }
         menu.addSeparator()
-        remove_row = menu.addAction("Remove row")
-        remove_column = menu.addAction("Remove column")
+        remove_row = menu.addAction(get_icon("bin"), "Remove row")
+        remove_column = menu.addAction(get_icon("bin"), "Remove column")
         remove_row.setEnabled(self.stops_table.rowCount() > 2)
         remove_column.setEnabled(self.stops_table.columnCount() > 2)
         actions[remove_row] = lambda: self._remove_row(row)

@@ -35,7 +35,8 @@ class MeshImportTask:
         mesh.rotate_z(self.model.rotation[2], inplace=True)
         report(0.9)
         mesh.translate(self.model.offset, inplace=True)
-        self.block_object.mesh_data = mesh
+        self.block_object.set_mesh_data(mesh)
+        self.block_object.process()
         report(1.0)
         return self.block_object
 

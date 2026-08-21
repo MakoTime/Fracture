@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHeaderView,
 )
+from PySide6.QtCore import QTimer
 
 from components.tree import TreeManager, TreeModel
 from components.tree.roots import root_objects
@@ -38,8 +39,9 @@ class ProjectController:
         self.tree_model = TreeModel(root_objects.get_nodes())
         self.window.treeWidget.setModel(self.tree_model)
         self.window.tableView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+            QHeaderView.ResizeMode.Interactive
         )
+        self._configure_scene_splitters()
         self.window.tableView.clicked.connect(self.table_model.handle_click)
         self.window.workspace_tabs = self.window.workspaceTabs
         self.window.scene_viewer = self.window.sceneViewer
@@ -89,6 +91,30 @@ class ProjectController:
                 lambda checked=False: self.open_project()
             )
         return self.window
+
+    def _configure_scene_splitters(self):
+        """Set compact defaults while keeping all Scene panels resizable."""
+        dock_splitter = self.window.sceneDockSplitter
+        dock_splitter.setStretchFactor(0, 1)
+        dock_splitter.setStretchFactor(1, 5)
+
+        main_splitter = self.window.sceneMainSplitter
+        main_splitter.setStretchFactor(0, 5)
+        main_splitter.setStretchFactor(1, 1)
+        QTimer.singleShot(0, lambda: self._set_scene_splitter_sizes(
+            dock_splitter, (1, 5)
+        ))
+        QTimer.singleShot(0, lambda: self._set_scene_splitter_sizes(
+            main_splitter, (5, 1)
+        ))
+
+    @staticmethod
+    def _set_scene_splitter_sizes(splitter, ratio):
+        total = splitter.width()
+        if total <= 0:
+            return
+        first = round(total * ratio[0] / sum(ratio))
+        splitter.setSizes([first, total - first])
 
     def _lock_scene_docks(self):
         """Keep Scene-tab panels embedded and resizable without controls."""

@@ -53,6 +53,18 @@ class ObjectImporterModel:
         object_base.destroy()
         return object_base
 
+    def refresh_object(self, object_base):
+        """Refresh persisted, tabular, and visible state after block work."""
+        block = getattr(object_base, "block_object", None)
+        if block is not None:
+            self.persist_block(block)
+        if hasattr(self.table_model, "refresh_object"):
+            self.table_model.refresh_object(object_base)
+        scene = self.scene_viewer
+        if scene is not None and hasattr(scene, "refresh_object"):
+            scene.refresh_object(object_base)
+        return object_base
+
     def associated_parents(self, object_base):
         """Return tree objects whose blocks reference this object's block."""
         block = getattr(object_base, "block_object", None)

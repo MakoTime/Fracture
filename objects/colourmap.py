@@ -6,6 +6,7 @@ from components.tree.roots import colourmap_root
 from engine.block_objects import ColourmapBlockObject
 
 from .object_base import ObjectBase
+from common.icons import get_icon
 
 
 class ColourmapObject(ObjectBase):
@@ -29,7 +30,7 @@ class ColourmapObject(ObjectBase):
         self.colourmap_block_object = block
         super().__init__(
             name=name,
-            icon=icon,
+            icon=icon if icon is not None else get_icon("colour_palette"),
             visible=visible,
             guid=guid,
             auto_register_root=auto_register_root,
@@ -55,6 +56,7 @@ class ColourmapObject(ObjectBase):
         return self.colourmap_block_object.field2_name
 
     def apply(self, values):
+        self.block_object.process()
         return self.colourmap_block_object.apply(values)
 
     def add_to_tree(self, tree_manager, parent=None):

@@ -3,12 +3,13 @@ from typing import Optional
 from PySide6.QtWidgets import QDialog, QTabWidget, QTreeView, QWidget
 
 from components.tree import TreeModel, TreeSearch
-from components.tree.roots import root_objects
+from components.tree.roots import root_objects, transform_root
 from components.tree.roots import mesh_root
 from dialog.mesh_edit.factory import create_mesh_edit_dialog
 from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
 from dialog.mesh_generate import GenerateMeshWindow
 from dialog.mesh_generate import MeshGenerateModel
+from dialog.mesh_filter import MeshFilterModel, create_mesh_filter_dialog
 from dialog.mesh_import.factory import (
     create_elevation_import_dialog,
     create_mesh_import_dialog,
@@ -17,11 +18,13 @@ from dialog.notify import create_notification
 from engine import EngineTask
 from engine.block_objects import MeshBlockObject
 from objects.colourmap import ColourmapObject
-from engine.block_tasks import GeneratedMeshTask, MeshImportTask
+from engine.block_tasks import GeneratedMeshTask, MeshFilterTask, MeshImportTask
 from engine.block_tasks import PerlinNoiseTransformTask
 from objects.mesh_object import MeshObject
 from objects.generated_mesh import GeneratedMesh
+from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from tools.dropdown import create_dropdown_menu
+from common.icons import get_icon
 
 from .object_importer import ObjectImporterModel
 
@@ -129,6 +132,82 @@ class MeshImportController:
             workspace_tabs.setCurrentWidget(window)
         return window
 
+    def filter_mesh(self, mesh_object: GeneratedMesh):
+        """Open the mesh filter workspace for an existing generated mesh."""
+        transforms = tuple(
+            node.node_object
+            for node in transform_root.children
+            if isinstance(node.node_object, PerlinNoiseTransformObject)
+        )
+        window = create_mesh_filter_dialog(
+            MeshFilterModel.from_mesh(mesh_object),
+            parent=self.parent,
+            on_apply=lambda model: self._register_filtered_mesh(
+                model.generate(), mesh_object, model
+            ),
+            transforms=tuple(transforms),
+        )
+        workspace_tabs = (
+            self.parent.findChild(QTabWidget, "workspaceTabs")
+            if self.parent is not None
+            else None
+        )
+        if workspace_tabs is None:
+            window.show()
+            return window
+        workspace_tabs.addTab(window, "Filter Mesh")
+        workspace_tabs.setCurrentWidget(window)
+        return window
+
+    def _register_filtered_mesh(self, filtered_mesh, source_mesh, filter_model=None):
+        self.object_importer.persist_block(filtered_mesh.mesh_block_object)
+        self.object_importer.register(
+            filtered_mesh,
+            parent=mesh_root,
+            add_to_scene=True,
+        )
+        self._sync_generated_mesh_children(filtered_mesh)
+        self._bind_generated_mesh_tasks(source_mesh)
+        self._bind_filtered_mesh_task(
+            filtered_mesh,
+            source_mesh,
+            filter_model,
+        )
+        self._show_mesh(filtered_mesh)
+        return filtered_mesh
+
+    def _bind_filtered_mesh_task(
+        self,
+        filtered_mesh,
+        source_mesh,
+        filter_model,
+    ):
+        if filter_model is None or self.engine_runner is None:
+            return None
+        transform_block = filter_model._transform_block()
+        if hasattr(self.engine_runner, "enqueue_block_task"):
+            self.engine_runner.enqueue_block_task(
+                f"Configure {transform_block.name}",
+                PerlinNoiseTransformTask(transform_block),
+            )
+        task = MeshFilterTask(
+            source_mesh.mesh_block_object,
+            transform_block,
+            filter_model.noise_minimum,
+            filter_model.noise_maximum,
+            filter_model.noise_penetration,
+            block_object=filtered_mesh.mesh_block_object,
+        )
+        if not hasattr(self.engine_runner, "enqueue_block_task"):
+            return None
+        if hasattr(self.engine_runner, "task_model"):
+            return self.engine_runner.enqueue_block_task(
+                f"Filter {filtered_mesh.name}",
+                task,
+                on_finished=lambda finished: self._finish_task(filtered_mesh, finished),
+            )
+        return self.engine_runner.enqueue_block_task(f"Filter {filtered_mesh.name}", task)
+
     def _replace_generated_mesh(self, mesh_object, edited_mesh):
         was_visible = mesh_object.visible
         colourmap = mesh_object.colourmap
@@ -179,18 +258,29 @@ class MeshImportController:
             return
         block = mesh_object.mesh_block_object
         child = block.perlin_noise_transform
-        if child is None:
-            return
+        if child is not None:
+            self.engine_runner.enqueue_block_task(
+                f"Configure {child.name}",
+                PerlinNoiseTransformTask(child),
+            )
         model = MeshGenerateModel.from_generated_mesh(mesh_object)
         parent_task = GeneratedMeshTask(model, block)
-        self.engine_runner.enqueue_block_task(
-            f"Configure {child.name}",
-            PerlinNoiseTransformTask(child),
-        )
-        self.engine_runner.enqueue_block_task(
-            f"Regenerate {mesh_object.name}",
-            parent_task,
-        )
+        if hasattr(self.engine_runner, "task_model"):
+            self.engine_runner.enqueue_block_task(
+                f"Regenerate {mesh_object.name}",
+                parent_task,
+                on_finished=lambda finished: self._finish_task(mesh_object, finished),
+            )
+        else:
+            self.engine_runner.enqueue_block_task(
+                f"Regenerate {mesh_object.name}",
+                parent_task,
+            )
+
+    def _finish_task(self, mesh_object, task):
+        if task.error:
+            return
+        self.object_importer.refresh_object(mesh_object)
 
     def edit_mesh(self, mesh_object: MeshObject):
         """Edit an existing mesh after the dialog is accepted."""
@@ -216,7 +306,7 @@ class MeshImportController:
         return edited_mesh
 
     def edit_mesh_colourmap(self, mesh_object: MeshObject):
-        """Configure the colourmap and source fields assigned to a mesh."""
+        """Open the colourmap editor as a workspace tab."""
         colourmaps = TreeSearch(root_objects.get_nodes()).find(
             lambda node: isinstance(node.node_object, ColourmapObject)
         )
@@ -231,7 +321,18 @@ class MeshImportController:
             ),
             None,
         )
-        dialog = create_mesh_colourmap_dialog(
+        def apply_colourmap(model):
+            model.apply(mesh_object)
+            self._sync_mesh_children(mesh_object)
+            self.object_importer.persist_block(mesh_object.mesh_block_object)
+            scene = getattr(self.object_importer, "scene_viewer", None)
+            if scene is not None and hasattr(scene, "refresh_object_colourmap"):
+                scene.refresh_object_colourmap(mesh_object)
+            tree_model = self.tree_view.model()
+            if isinstance(tree_model, TreeModel):
+                tree_model.refresh()
+
+        window = create_mesh_colourmap_dialog(
             MeshColourmapModel(
                 mesh_object=mesh_object,
                 colourmap=selected,
@@ -242,19 +343,19 @@ class MeshImportController:
             ),
             colourmaps=tuple(colourmaps),
             parent=self.parent,
+            on_apply=apply_colourmap,
         )
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return None
-        dialog.update_model().apply(mesh_object)
-        self._sync_mesh_children(mesh_object)
-        self.object_importer.persist_block(mesh_object.mesh_block_object)
-        scene = getattr(self.object_importer, "scene_viewer", None)
-        if scene is not None and hasattr(scene, "refresh_object_colourmap"):
-            scene.refresh_object_colourmap(mesh_object)
-        tree_model = self.tree_view.model()
-        if isinstance(tree_model, TreeModel):
-            tree_model.refresh()
-        return mesh_object
+        workspace_tabs = (
+            self.parent.findChild(QTabWidget, "workspaceTabs")
+            if self.parent is not None
+            else None
+        )
+        if workspace_tabs is None:
+            window.show()
+            return window
+        workspace_tabs.addTab(window, "Edit Mesh Colourmap")
+        workspace_tabs.setCurrentWidget(window)
+        return window
 
     def _queue_import(self, model) -> Optional[EngineTask]:
         """Queue a mesh model and register it after engine processing."""
@@ -311,6 +412,12 @@ class MeshImportController:
                         lambda: self.edit_generation(node.node_object),
                     )
                 )
+                options.append(
+                    (
+                        "Filter Mesh",
+                        lambda: self.filter_mesh(node.node_object),
+                    )
+                )
             options.append(
                 (
                     "Edit Colourmap",
@@ -319,7 +426,9 @@ class MeshImportController:
             )
             options.append(("Edit Mesh", lambda: self.edit_mesh(node.node_object)))
             options.append(("Show in scene", lambda: self.show_mesh(node.node_object)))
-            options.append(("Delete", lambda: self.delete_mesh(node.node_object)))
+            options.append(
+                ("Delete", lambda: self.delete_mesh(node.node_object), get_icon("bin"))
+            )
         return create_dropdown_menu(options, parent)
 
     def show_mesh(self, mesh_object: MeshObject):

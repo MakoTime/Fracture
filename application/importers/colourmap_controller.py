@@ -7,6 +7,7 @@ from components.tree.roots import colourmap_root, root_objects
 from dialog.colourmap import ColourmapModel, create_colourmap_dialog
 from objects.colourmap import ColourmapObject
 from tools.dropdown import create_dropdown_menu
+from common.icons import get_icon
 
 
 class ColourmapController:
@@ -39,7 +40,7 @@ class ColourmapController:
             options.extend(
                 (
                     ("Edit", lambda: self.edit(node.node_object)),
-                    ("Delete", lambda: self.delete(node.node_object)),
+                    ("Delete", lambda: self.delete(node.node_object), get_icon("bin")),
                 )
             )
         return create_dropdown_menu(options, parent)
@@ -63,24 +64,10 @@ class ColourmapController:
             return None
         updated = dialog.update_model()
         block = colourmap.block_object
-        block.stops = updated.stops
         block.comments = updated.comments
-        block.field1_name = updated.field1_name
-        block.field2_name = updated.field2_name
-        block.field1_positions = updated.field1_positions
-        block.field2_positions = updated.field2_positions
-        block.colour_grid = updated.colour_grid
-        block.field1_curve_points = updated.field1_curve_points
-        block.field1_curve_handles = updated.field1_curve_handles
-        block.field2_curve_points = updated.field2_curve_points
-        block.field2_curve_handles = updated.field2_curve_handles
-        block.noise_enabled = updated.noise_enabled
-        block.set_perlin_noise_transform(
-            getattr(updated.perlin_noise_transform, "block_object", updated.perlin_noise_transform)
-        )
+        block.update_from(updated)
         colourmap._on_name_changed(updated.name.strip() or colourmap.name)
         block.name = colourmap.name
-        block.invalidate()
         self.object_importer.persist_block(block)
         scene = getattr(self.object_importer, "scene_viewer", None)
         if scene is not None and hasattr(scene, "scene_model"):

@@ -7,13 +7,14 @@ from tools.widgets import (
     RewindWidget,
     VisibleWidget,
 )
-from components.table import TableView
+from components.table import TableManager, TableView
 from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_import.view import MeshImportView
 from components.world_state import WorldStateView
 from dialog.mesh_generate.view import NormalizedSpinBox
 from tools.widgets import DynamicSpinbox
 from objects.object_base import ObjectBase
+from objects.mesh_object import MeshObject
 
 
 def test_visible_widget_starts_with_invisible_state(qapp):
@@ -203,6 +204,45 @@ def test_table_view_uses_visible_widget_for_visible_column(qapp):
     widget.click()
 
     assert object_base.visible is True
+
+
+def test_table_model_refresh_object_notifies_registered_row(qapp):
+    table_view = TableView()
+    object_base = ObjectBase("Refreshable")
+    table_view.table_model.add_row(object_base.row_data)
+    changed = []
+    table_view.table_model.dataChanged.connect(
+        lambda top_left, bottom_right: changed.append(
+            (top_left.row(), bottom_right.column())
+        )
+    )
+
+    assert table_view.table_model.refresh_object(object_base) is True
+    assert changed == [(0, table_view.table_model.columnCount() - 1)]
+
+
+def test_object_block_change_refreshes_table_and_scene_views(qapp):
+    class FakeScene:
+        def __init__(self):
+            self.refreshed = []
+
+        def add_object(self, object_base):
+            return object_base
+
+        def refresh_object(self, object_base):
+            self.refreshed.append(object_base)
+
+    mesh = MeshObject("Refreshable mesh")
+    table_manager = TableManager()
+    table_model = TableView(table_manager=table_manager).table_model
+    scene = FakeScene()
+    mesh.add_to_table(table_manager)
+    mesh.add_to_scene(scene)
+
+    mesh.mesh_block_object.mark_changed()
+
+    assert scene.refreshed == [mesh]
+    assert table_model.rowCount() == 1
 
 
 def test_mesh_import_destination_checkbox_updates_model(qapp):

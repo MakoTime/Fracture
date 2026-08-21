@@ -31,7 +31,6 @@ from tools.widgets import VisibleWidget
 
 from .model import MeshGenerateModel
 from dialog.mesh_mask import create_surface_mask_dialog
-from objects.perlin_noise_transform import PerlinNoiseTransformObject
 
 
 from contextlib import contextmanager
@@ -139,6 +138,8 @@ class GenerateMeshWindow(QMainWindow):
         self.setWindowTitle("Generate Mesh")
         self.resize(900, 560)
         self.model = model or MeshGenerateModel()
+        self.model.noise_enabled = False
+        self.model.perlin_noise_transform = None
         self._on_apply = on_apply
         self.tree_search = tree_search
         self._applied_mesh = None
@@ -214,45 +215,6 @@ class GenerateMeshWindow(QMainWindow):
         mask_group = QGroupBox("Surface masks")
         mask_group.setLayout(mask_form)
 
-        self.noise_enabled = QCheckBox("Enable Perlin noise")
-        self.noise_enabled.setChecked(self.model.noise_enabled)
-        self.noise_minimum = NormalizedSpinBox()
-        self.noise_minimum.setValue(self.model.noise_minimum)
-        self.noise_maximum = NormalizedSpinBox()
-        self.noise_maximum.setValue(self.model.noise_maximum)
-        self.perlin_noise_field = QComboBox()
-        self.perlin_noise_field.addItem("None", None)
-        self._perlin_noise_objects = self._find_perlin_noise_objects()
-        for transform in self._perlin_noise_objects:
-            self.perlin_noise_field.addItem(transform.name, transform)
-        self._select_perlin_noise_transform(self.model.perlin_noise_transform)
-        self.perlin_noise_field.currentIndexChanged.connect(
-            self._perlin_noise_changed
-        )
-        self.noise_penetration = QSpinBox()
-        self.noise_penetration.setRange(1, 64)
-        self.noise_penetration.setValue(self.model.noise_penetration)
-        self.noise_penetration.setToolTip("Number of grid layers affected inward from each surface")
-        noise_form = QFormLayout()
-        noise_form.addRow("Enabled", self.noise_enabled)
-        noise_form.addRow("Minimum contour", self.noise_minimum)
-        noise_form.addRow("Maximum contour", self.noise_maximum)
-        noise_form.addRow("Transform", self.perlin_noise_field)
-        noise_form.addRow("Penetration", self.noise_penetration)
-        noise_group = QGroupBox("Smoothing and Noise")
-        noise_group.setLayout(noise_form)
-        self.noise_minimum.valueChanged.connect(self.noise_maximum.setMinimum)
-        self.noise_maximum.valueChanged.connect(self.noise_minimum.setMaximum)
-        for control in (
-            self.noise_enabled,
-            self.noise_minimum,
-            self.noise_maximum,
-            self.noise_penetration,
-        ):
-            control.valueChanged.connect(self._noise_changed) if hasattr(
-                control, "valueChanged"
-            ) else control.toggled.connect(self._noise_changed)
-
         self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Cancel
             | QDialogButtonBox.StandardButton.Apply
@@ -270,7 +232,6 @@ class GenerateMeshWindow(QMainWindow):
         left_layout.addWidget(generation_group)
         left_layout.addWidget(point_group)
         left_layout.addWidget(mask_group)
-        left_layout.addWidget(noise_group)
         left_layout.addStretch(1)
 
         top = QSplitter(Qt.Orientation.Horizontal)
@@ -334,10 +295,6 @@ class GenerateMeshWindow(QMainWindow):
         self.model.show_mask_surface = self.show_mask_surface.is_visible()
         self.model.flexible_masks = self.flexible_masks.isChecked()
         self.model.flexible_grid = self.flexible_grid.isChecked()
-        self.model.noise_enabled = self.noise_enabled.isChecked()
-        self.model.noise_minimum = self.noise_minimum.value()
-        self.model.noise_maximum = self.noise_maximum.value()
-        self.model.noise_penetration = self.noise_penetration.value()
         self._applied_mesh = self.model.generate()
         if self._on_apply is not None:
             self._on_apply(self._applied_mesh)
@@ -373,35 +330,6 @@ class GenerateMeshWindow(QMainWindow):
 
     def _update_grid_point_alpha_label(self, value):
         self.grid_point_alpha_value.setText(f"{value}%")
-
-    def _noise_changed(self, value):
-        del value
-        self.model.noise_enabled = self.noise_enabled.isChecked()
-        self.model.noise_minimum = self.noise_minimum.value()
-        self.model.noise_maximum = self.noise_maximum.value()
-        self.model.noise_penetration = self.noise_penetration.value()
-        self._update_preview()
-
-    def _find_perlin_noise_objects(self):
-        if self.tree_search is None:
-            return []
-        return self.tree_search.find(
-            lambda node: isinstance(node.node_object, PerlinNoiseTransformObject)
-        )
-
-    def _select_perlin_noise_transform(self, transform):
-        block = getattr(transform, "block_object", transform)
-        guid = getattr(block, "guid", None)
-        for index, candidate in enumerate(self._perlin_noise_objects, start=1):
-            if candidate.block_object is block or candidate.block_object.guid == guid:
-                self.perlin_noise_field.setCurrentIndex(index)
-                self.model.perlin_noise_transform = candidate
-                return
-        self.perlin_noise_field.setCurrentIndex(0)
-
-    def _perlin_noise_changed(self):
-        self.model.perlin_noise_transform = self.perlin_noise_field.currentData()
-        self._update_preview()
 
     def _edit_mask(self, axis):
         editor = create_surface_mask_dialog(
@@ -442,6 +370,8 @@ class GenerateMeshWindow(QMainWindow):
     def _update_preview(self):
         if not self._preview_ready:
             return
+        self.model.noise_enabled = False
+        self.model.perlin_noise_transform = None
         self.model.grid_size = self.grid_size.value()
         self.model.show_grid = self.grid_visibility.is_visible()
         self.model.show_mask_surface = self.show_mask_surface.is_visible()
