@@ -3,7 +3,12 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
+from PySide6.QtWidgets import (
+	QApplication,
+	QDialogButtonBox,
+	QMainWindow,
+	QTabWidget,
+)
 from PySide6.QtUiTools import QUiLoader
 
 from application import ProjectController
@@ -12,6 +17,7 @@ from components.scene import SceneViewer
 from components.table import TableView
 from components.tree import TreeView
 from components.world_state import WorldStateView
+from dialog.notify import create_notification
 from engine import EngineRunner
 
 
@@ -71,7 +77,9 @@ def load_application_window(store=None):
 		controller = project_window.project_controller
 		file_menu = host_menu_bar.addMenu("File")
 		open_action = QAction("Open Project", host)
-		open_action.triggered.connect(controller.open_project)
+		open_action.triggered.connect(
+			lambda checked=False: choose_and_open_project(controller)
+		)
 		file_menu.addAction(open_action)
 		save_action = QAction("Save", host)
 		save_action.triggered.connect(controller.save_project)
@@ -109,13 +117,47 @@ def load_application_window(store=None):
 
 	tabs.currentChanged.connect(update_menu)
 
+	def close_current_projects(save):
+		for index in sorted(project_windows, reverse=True):
+			project_window = project_windows.pop(index)
+			project_window.project_controller.close_project(save=save)
+			tabs.removeTab(index)
+
+	def confirm_project_switch():
+		if not project_windows:
+			return True
+		dialog = create_notification(
+			"Close current project?",
+			"Opening a new project will close the current project.",
+			parent=host,
+			actions=(
+				("Cancel", QDialogButtonBox.ButtonRole.RejectRole),
+				("Save and Close", QDialogButtonBox.ButtonRole.AcceptRole),
+				("Close without saving", QDialogButtonBox.ButtonRole.AcceptRole),
+			),
+		)
+		dialog.exec()
+		if dialog.selected_action == "Cancel":
+			return False
+		close_current_projects(dialog.selected_action == "Save and Close")
+		return True
+
+	def choose_and_open_project(controller):
+		project_file = controller.choose_project_file()
+		if project_file:
+			open_project(project_file)
+
 	def open_project(project_file):
+		if not project_file or not confirm_project_switch():
+			return
 		project_window = load_main_window(project_file, menu_bar=host_menu_bar)
 		add_project_tab(project_window)
 
 	file_window.on_project_opened = open_project
 
 	def create_project(project_file):
+		if not confirm_project_switch():
+			return
 		project_window = load_main_window(None, menu_bar=host_menu_bar)
 		project_window.project_controller.create_project(project_file)
 		add_project_tab(project_window)

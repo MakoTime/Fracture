@@ -1,0 +1,90 @@
+from typing import Protocol, runtime_checkable
+
+from PySide6.QtWidgets import QDialogButtonBox
+from PySide6.QtWidgets import QAbstractButton
+
+
+@runtime_checkable
+class HasEditorButtons(Protocol):
+	"""Interface for editors exposing standard action buttons."""
+
+	@property
+	def ok_button(self) -> QAbstractButton | None:
+		...
+
+	@property
+	def cancel_button(self) -> QAbstractButton | None:
+		...
+
+	@property
+	def apply_button(self) -> QAbstractButton | None:
+		...
+
+	def create_button_box(
+		self,
+		buttons: QDialogButtonBox.StandardButton | None = None,
+	) -> QDialogButtonBox:
+		...
+
+
+class EditorView:
+	"""Common interaction contract shared by popup and tab editors."""
+
+	def __init__(self, model=None, on_apply=None, on_close=None):
+		self.model = model
+		self._on_apply = on_apply
+		self._on_close = on_close
+		self._close_notified = False
+
+	def update_model(self):
+		"""Copy editor-widget values into the model."""
+		return self.model
+
+	def apply_model(self):
+		"""Validate and return the applied model value."""
+		return self.model.apply()
+
+	def apply_changes(self):
+		"""Update, apply, and publish the model's current editor state."""
+		self.update_model()
+		result = self.apply_model()
+		if self._on_apply is not None:
+			self._on_apply(result)
+		return result
+
+	def _apply(self):
+		"""Preserve the legacy direct-apply helper."""
+		return self.apply_changes()
+
+	def notify_closed(self, reason="window"):
+		"""Notify the owner once after this editor's close was requested."""
+		if self._close_notified:
+			return False
+		self._close_notified = True
+		if self._on_close is not None:
+			self._on_close(self.model, reason)
+		return True
+
+
+class EditorButtonBoxImplementation:
+	"""Reusable Qt implementation of the editor button interface."""
+
+	def __init__(self):
+		self.button_box = None
+
+	@property
+	def ok_button(self):
+		return self._button(QDialogButtonBox.StandardButton.Ok)
+
+	@property
+	def cancel_button(self):
+		return self._button(QDialogButtonBox.StandardButton.Cancel)
+
+	@property
+	def apply_button(self):
+		return self._button(QDialogButtonBox.StandardButton.Apply)
+
+	def _button(self, standard_button):
+		if self.button_box is None:
+			return None
+		return self.button_box.button(standard_button)

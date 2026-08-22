@@ -55,6 +55,7 @@ class ProjectController:
             tree_manager=self.tree_manager,
             scene_viewer=self.window.scene_viewer,
         )
+        self.object_importer.engine_runner = self.window.engine_runner
         self.window.object_importer = self.object_importer
         self.controllers.extend(
             self.object_importer.bind_registered_features(
@@ -168,6 +169,12 @@ class ProjectController:
 
     def create_project(self, project_file):
         """Create an empty project and make it the active save target."""
+        self.project_serializer._clear_current_project(
+            self.table_model,
+            self.window.scene_viewer,
+            getattr(self.window, "engine_runner", None),
+            getattr(self, "tree_model", None),
+        )
         saved_file = self.project_serializer.save(
             project_file,
             self.table_model,
@@ -176,6 +183,18 @@ class ProjectController:
         self.project_file = saved_file
         self._set_block_data_directory(saved_file)
         return saved_file
+
+    def close_project(self, save=False):
+        """Close the active project and release its registered work."""
+        if save:
+            self.save_project()
+        self.project_serializer._clear_current_project(
+            self.table_model,
+            self.window.scene_viewer,
+            self.window.engine_runner,
+            self.tree_model,
+        )
+        self.project_file = None
 
     def load_project(self, project_file):
         """Load a project and make its file the active save target."""
@@ -195,8 +214,8 @@ class ProjectController:
             Path(project_file).parent / "block_data"
         )
 
-    def open_project(self):
-        """Load a project JSON file and rebuild its registered objects."""
+    def choose_project_file(self):
+        """Ask the user for a project file without loading it."""
         from PySide6.QtWidgets import QFileDialog
 
         project_file, _ = QFileDialog.getOpenFileName(
@@ -204,6 +223,11 @@ class ProjectController:
             "Open Project",
             filter="RainFall projects (project.json);;JSON files (*.json)",
         )
+        return project_file
+
+    def open_project(self):
+        """Load a project JSON file and rebuild its registered objects."""
+        project_file = self.choose_project_file()
         if not project_file:
             return None
         return self.load_project(project_file)

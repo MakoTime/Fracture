@@ -134,13 +134,25 @@ class ProjectSerializer:
         project_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return project_file
 
-    def load(self, project_file, object_importer, tree_model, table_model, scene_viewer):
+    def load(
+        self,
+        project_file,
+        object_importer,
+        tree_model,
+        table_model,
+        scene_viewer,
+    ):
         project_path = Path(project_file)
         data = upgrade_project_data(
             json.loads(project_path.read_text(encoding="utf-8"))
         )
 
-        self._clear_current_project(table_model, scene_viewer)
+        self._clear_current_project(
+            table_model,
+            scene_viewer,
+            getattr(object_importer, "engine_runner", None),
+            tree_model,
+        )
         loaded = {}
         pending = list(data.get("objects", []))
         while pending:
@@ -365,8 +377,27 @@ class ProjectSerializer:
             mesh_object.node.set_block_child_objects(children)
 
     @staticmethod
-    def _clear_current_project(table_model, scene_viewer):
-        scene_viewer.clear_scene()
+    def _clear_current_project(
+        table_model,
+        scene_viewer,
+        engine_runner=None,
+        tree_model=None,
+    ):
+        if tree_model is not None:
+            tree_model.beginResetModel()
+        if engine_runner is not None and hasattr(engine_runner, "clear"):
+            engine_runner.clear()
+        objects = []
+        for root in (mesh_root, transform_root, colourmap_root):
+            objects.extend(
+                node.node_object
+                for node in ProjectSerializer._walk_nodes(root)
+                if hasattr(node, "node_object")
+            )
+        for object_base in objects:
+            object_base.destroy()
+        if hasattr(scene_viewer, "clear_scene"):
+            scene_viewer.clear_scene()
         table_model.beginResetModel()
         table_model.table_manager.get_data().clear()
         table_model.endResetModel()
@@ -374,3 +405,5 @@ class ProjectSerializer:
         transform_root.children.clear()
         colourmap_root.children.clear()
         root_objects.nodes[:] = [mesh_root, transform_root, colourmap_root]
+        if tree_model is not None:
+            tree_model.endResetModel()

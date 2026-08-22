@@ -5,10 +5,11 @@ import numpy as np
 from objects.generated_mesh import GeneratedMesh
 from engine.block_tasks import MeshGenerateTask
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
+from dialog.base.editor import EditorModel
 
 
 @dataclass
-class MeshGenerateModel:
+class MeshGenerateModel(EditorModel):
     """Editable settings for a basic generated mesh."""
 
     name: str = "Generated Mesh"

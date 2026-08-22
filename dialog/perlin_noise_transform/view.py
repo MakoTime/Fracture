@@ -4,8 +4,6 @@ import math
 from PySide6.QtWidgets import (
     QComboBox,
     QCheckBox,
-    QDialog,
-    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
@@ -20,16 +18,20 @@ from PySide6.QtWidgets import (
 from tools.widgets import BezierCurveGraph
 from .model import PerlinNoiseTransformModel
 from tools.widgets import DynamicSpinbox
+from dialog.base.popup_editor import PopupEditorView
 
 
-class PerlinNoiseTransformView(QDialog):
+class PerlinNoiseTransformView(PopupEditorView):
     """Editor for discrete Perlin bands and sampled continuous curves."""
 
     PRESETS = ("Manual", "Impulse", "Flat bar", "Sin wave", "Cos wave", "Normal distribution")
 
     def __init__(self, model=None, parent=None):
-        super().__init__(parent)
-        self.model = model or PerlinNoiseTransformModel()
+        PopupEditorView.__init__(
+            self,
+            model or PerlinNoiseTransformModel(),
+            parent=parent,
+        )
         self.setWindowTitle("Perlin Noise Transform")
         self.resize(820, 430)
 
@@ -143,11 +145,7 @@ class PerlinNoiseTransformView(QDialog):
         graph_layout.addWidget(self.graph_position_label)
         graph_layout.addWidget(self._options_widget())
 
-        self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok
-        )
-        self.button_box.accepted.connect(self._accept)
-        self.button_box.rejected.connect(self.reject)
+        self.create_button_box()
         layout = QVBoxLayout(self)
         editor = QHBoxLayout()
         editor.addWidget(group, 0)
@@ -359,7 +357,7 @@ class PerlinNoiseTransformView(QDialog):
             self.graph.set_amplitudes(values)
         self._graph_labels_changed()
 
-    def _accept(self):
+    def apply_model(self):
         try:
             mode = self.mode_field.currentData()
             if mode == "continuous":
@@ -388,10 +386,12 @@ class PerlinNoiseTransformView(QDialog):
             )
         except (TypeError, ValueError):
             return
-        self.accept()
-
-    def update_model(self):
         return self.model
+
+    def _accept(self):
+        """Preserve the legacy direct-accept helper used by callers and tests."""
+        if self.apply_model() is not None:
+            self.accept()
 
     @staticmethod
     def load_json(path):

@@ -1,17 +1,14 @@
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QLineEdit,
     QSpinBox,
     QVBoxLayout,
-    QMainWindow,
     QLabel,
     QSplitter,
-    QTabWidget,
     QWidget,
 )
 from PySide6.QtCore import QTimer, Qt
@@ -19,20 +16,27 @@ from PySide6.QtCore import QTimer, Qt
 from components.scene import SceneViewer
 from tools.widgets import VisibleWidget
 
+from dialog.base.tab_editor import TabEditorView
+
 from .model import MeshFilterModel
 
 
-class MeshFilterView(QMainWindow):
+class MeshFilterView(TabEditorView):
     def __init__(
         self,
         model: MeshFilterModel,
         transforms=(),
         parent=None,
         on_apply=None,
+        on_close=None,
     ):
-        super().__init__(parent)
-        self.model = model
-        self._on_apply = on_apply
+        TabEditorView.__init__(
+            self,
+            model,
+            parent=parent,
+            on_apply=on_apply,
+            on_close=on_close,
+        )
         self.transforms = tuple(transforms)
         self.setWindowTitle("Filter Generated Mesh")
         self.resize(900, 560)
@@ -99,13 +103,7 @@ class MeshFilterView(QMainWindow):
         group = QGroupBox("Smoothing and Noise")
         group.setLayout(form)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Cancel
-            | QDialogButtonBox.StandardButton.Apply
-            | QDialogButtonBox.StandardButton.Ok
-        )
-        buttons.rejected.connect(self.close)
-        buttons.clicked.connect(self._button_clicked)
+        self.create_button_box()
 
         left_panel = QWidget()
         left_panel.setMinimumWidth(220)
@@ -127,7 +125,7 @@ class MeshFilterView(QMainWindow):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.addWidget(top)
-        layout.addWidget(buttons)
+        layout.addWidget(self.button_box)
         self.setCentralWidget(content)
         self._set_model()
         self._update_filter_state()
@@ -171,14 +169,9 @@ class MeshFilterView(QMainWindow):
         has_transform = self.model.has_transform
         self.enabled.setEnabled(has_transform)
         self.enabled.setChecked(bool(has_transform and self.model.noise_enabled))
-        buttons = self.findChildren(QDialogButtonBox)
-        if buttons:
-            buttons[0].button(QDialogButtonBox.StandardButton.Apply).setEnabled(
-                self.model.filter_enabled
-            )
-            buttons[0].button(QDialogButtonBox.StandardButton.Ok).setEnabled(
-                self.model.filter_enabled
-            )
+        if self.button_box is not None:
+            self.apply_button.setEnabled(self.model.filter_enabled)
+            self.ok_button.setEnabled(self.model.filter_enabled)
 
     def _initialize_preview(self):
         if self._preview_ready:
@@ -240,31 +233,7 @@ class MeshFilterView(QMainWindow):
             self._preview_camera_initialized = True
         self.preview.plotter.render()
 
-    def _button_clicked(self, button):
-        role = self.sender().buttonRole(button)
-        if role in (
-            QDialogButtonBox.ButtonRole.AcceptRole,
-            QDialogButtonBox.ButtonRole.ApplyRole,
-        ):
-            if not self.model.filter_enabled:
-                return
-            self.update_model()
-            if self._on_apply is not None:
-                self._on_apply(self.model)
-        if role == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.close()
-
-    def closeEvent(self, event):
-        window = self.parentWidget()
-        while window is not None and window.parentWidget() is not None:
-            window = window.parentWidget()
-        tabs = (
-            window.findChild(QTabWidget, "workspaceTabs")
-            if window is not None
-            else None
-        )
-        if tabs is not None:
-            index = tabs.indexOf(self)
-            if index >= 0:
-                tabs.removeTab(index)
-        super().closeEvent(event)
+    def apply_model(self):
+        if not self.model.filter_enabled:
+            return None
+        return self.model

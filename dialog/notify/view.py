@@ -18,6 +18,7 @@ class NotifyView(QDialog):
 
     def __init__(self, model: NotifyModel, parent=None):
         super().__init__(parent)
+        self.selected_action = None
         self.setWindowTitle("Notification")
         self.resize(420, 220)
 
@@ -61,6 +62,22 @@ class NotifyView(QDialog):
         layout.addWidget(self.button_box)
 
         self.set_model(model)
+
+    def set_actions(self, actions):
+        """Replace the standard buttons with named actions."""
+        self.button_box.clear()
+        for label, role in actions:
+            button = self.button_box.addButton(label, role)
+            button.clicked.connect(
+                lambda _checked=False, action=label: self._choose_action(action)
+            )
+
+    def _choose_action(self, action):
+        self.selected_action = action
+        if action == "Cancel":
+            self.reject()
+        else:
+            self.accept()
 
     def set_model(self, model: NotifyModel):
         """Apply notification data to the dialog widgets."""

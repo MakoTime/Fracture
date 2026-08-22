@@ -13,6 +13,7 @@ def create_notification(
     icon: Optional[QPixmap] = None,
     parent=None,
     confirm=False,
+    actions=None,
 ) -> NotifyView:
     """Build a notification dialog from its display data."""
     view = NotifyView(
@@ -23,4 +24,6 @@ def create_notification(
         view.button_box.setStandardButtons(
             QDialogButtonBox.StandardButton.Ok
         )
+    if actions is not None:
+        view.set_actions(actions)
     return view

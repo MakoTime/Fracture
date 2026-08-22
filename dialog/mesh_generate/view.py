@@ -11,14 +11,12 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QLineEdit,
-    QMainWindow,
     QPushButton,
     QSplitter,
     QSpinBox,
     QStyle,
     QSlider,
     QToolButton,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -28,6 +26,7 @@ import pyvista as pv
 
 from components.scene import SceneViewer
 from tools.widgets import VisibleWidget
+from dialog.base.tab_editor import TabEditorView
 
 from .model import MeshGenerateModel
 from dialog.mesh_mask import create_surface_mask_dialog
@@ -126,7 +125,7 @@ class IntegerVector3Widget(QWidget):
             spin.setValue(int(component))
 
 
-class GenerateMeshWindow(QMainWindow):
+class GenerateMeshWindow(TabEditorView):
     """Workspace for configuring and applying a basic generated mesh."""
 
     GRID_POINT_SIZE_MIN = 2.0
@@ -134,13 +133,16 @@ class GenerateMeshWindow(QMainWindow):
     GRID_POINT_SIZE_REFERENCE_COUNT = 1_000
 
     def __init__(self, parent=None, model=None, on_apply=None, tree_search=None):
-        super().__init__(parent)
+        TabEditorView.__init__(
+            self,
+            model or MeshGenerateModel(),
+            parent=parent,
+            on_apply=on_apply,
+        )
         self.setWindowTitle("Generate Mesh")
         self.resize(900, 560)
-        self.model = model or MeshGenerateModel()
         self.model.noise_enabled = False
         self.model.perlin_noise_transform = None
-        self._on_apply = on_apply
         self.tree_search = tree_search
         self._applied_mesh = None
         self._preview_host = QWidget(self)
@@ -215,13 +217,7 @@ class GenerateMeshWindow(QMainWindow):
         mask_group = QGroupBox("Surface masks")
         mask_group.setLayout(mask_form)
 
-        self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Cancel
-            | QDialogButtonBox.StandardButton.Apply
-            | QDialogButtonBox.StandardButton.Ok
-        )
-        self.button_box.rejected.connect(self._cancel)
-        self.button_box.clicked.connect(self._button_clicked)
+        self.create_button_box()
 
         left_panel = QWidget()
         left_panel.setMinimumWidth(220)
@@ -253,7 +249,7 @@ class GenerateMeshWindow(QMainWindow):
 
     def _initialize_preview(self):
         """Construct the native VTK widget after the window enters the event loop."""
-        if self._preview_ready:
+        if self._preview_ready or not self.isVisible():
             return
         self.preview = SceneViewer(self)
         self.preview.setObjectName("meshPreview")
@@ -265,7 +261,8 @@ class GenerateMeshWindow(QMainWindow):
 
     def _zoom_initial_preview(self):
         """Zoom after the initial generated grid has been fitted."""
-        self.preview.zoom_camera(0.65)
+        if self._preview_ready and self.isVisible():
+            self.preview.zoom_camera(0.65)
         
     @contextmanager
     def change_camera(self):
@@ -275,20 +272,7 @@ class GenerateMeshWindow(QMainWindow):
         finally:
             self._reset_camera = False
 
-    def _button_clicked(self, button):
-        role = self.button_box.buttonRole(button)
-        if role in (
-            QDialogButtonBox.ButtonRole.ApplyRole,
-            QDialogButtonBox.ButtonRole.AcceptRole,
-        ):
-            self._apply()
-        if role == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.close()
-
-    def _cancel(self):
-        self.close()
-
-    def _apply(self):
+    def apply_model(self):
         self.model.name = self.name_field.text().strip() or "Generated Mesh"
         self.model.grid_size = self.grid_size.value()
         self.model.show_grid = self.grid_visibility.is_visible()
@@ -421,13 +405,3 @@ class GenerateMeshWindow(QMainWindow):
         columns = np.linspace(0, values.shape[1] - 1, shape[1]).round().astype(int)
         return values[np.ix_(rows, columns)]
 
-    def closeEvent(self, event):
-        """Remove this editor from the host tabs when it is closed."""
-        parent = self.parentWidget()
-        while parent is not None and not isinstance(parent, QTabWidget):
-            parent = parent.parentWidget()
-        if parent is not None:
-            tab_index = parent.indexOf(self)
-            if tab_index >= 0:
-                parent.removeTab(tab_index)
-        super().closeEvent(event)

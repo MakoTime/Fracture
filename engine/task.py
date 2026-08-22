@@ -187,6 +187,19 @@ class EngineTaskModel(QObject):
         block_object.remove_invalidation_callback(self._block_invalidated)
         return True
 
+    def clear(self):
+        """Stop tracking tasks and block callbacks for the current project."""
+        self.play()
+        self.wait_for_done()
+        for binding in tuple(self._block_tasks.values()):
+            binding["active"] = False
+            binding["task"].block_object.remove_invalidation_callback(
+                self._block_invalidated
+            )
+        self._block_tasks.clear()
+        self.tasks.clear()
+        self._next_id = 1
+
     def _enqueue_block_process(self, binding):
         if not binding["active"]:
             return None

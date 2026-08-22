@@ -434,7 +434,9 @@ class MeshImportController:
     def show_mesh(self, mesh_object: MeshObject):
         """Add a mesh to the active scene pipeline if it is not already loaded."""
         mesh_data = mesh_object.mesh_data
-        if mesh_data is None or getattr(mesh_data, "n_points", 0) == 0:
+        if mesh_data is None or (
+            hasattr(mesh_data, "n_points") and mesh_data.n_points == 0
+        ):
             dialog = create_notification(
                 "Cannot show mesh",
                 "This mesh has no surface points to display.",

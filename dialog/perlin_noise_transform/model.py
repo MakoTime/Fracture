@@ -1,11 +1,13 @@
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from dialog.base.editor import EditorModel
+
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 
 
 @dataclass
-class PerlinNoiseTransformModel:
+class PerlinNoiseTransformModel(EditorModel):
     """Editable settings for a multi-band Perlin noise transform."""
 
     name: str = "Perlin Noise Transform"

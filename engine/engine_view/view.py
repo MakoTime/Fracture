@@ -66,6 +66,11 @@ class EngineRunner(QWidget):
     def remove_block_task(self, block_object):
         return self.task_model.remove_block_task(block_object)
 
+    def clear(self):
+        self.task_model.clear()
+        self.task_table.setRowCount(0)
+        self._rows.clear()
+
     def _add_task(self, task: EngineTask):
         row = self.task_table.rowCount()
         self.task_table.insertRow(row)

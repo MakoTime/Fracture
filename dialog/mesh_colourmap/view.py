@@ -1,29 +1,38 @@
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QMainWindow,
-    QDialogButtonBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QSplitter,
     QVBoxLayout,
     QWidget,
-    QTabWidget,
 )
 from PySide6.QtCore import QTimer, Qt
 
 from components.scene import SceneViewer
+from dialog.base.tab_editor import TabEditorView
 from .model import MeshColourmapModel
 
 
-class MeshColourmapView(QMainWindow):
+class MeshColourmapView(TabEditorView):
     """Choose a mesh colourmap and map its two fields to mesh values."""
 
-    def __init__(self, model, colourmaps=(), parent=None, on_apply=None):
-        super().__init__(parent)
-        self.model = model
-        self._on_apply = on_apply
+    def __init__(
+        self,
+        model,
+        colourmaps=(),
+        parent=None,
+        on_apply=None,
+        on_close=None,
+    ):
+        TabEditorView.__init__(
+            self,
+            model,
+            parent=parent,
+            on_apply=on_apply,
+            on_close=on_close,
+        )
         self.setWindowTitle("Configure Mesh Colourmap")
         self.resize(900, 560)
 
@@ -61,13 +70,7 @@ class MeshColourmapView(QMainWindow):
         settings_group = QGroupBox("Colourmap")
         settings_group.setLayout(form)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Cancel
-            | QDialogButtonBox.StandardButton.Apply
-            | QDialogButtonBox.StandardButton.Ok
-        )
-        buttons.rejected.connect(self._cancel)
-        buttons.clicked.connect(self._button_clicked)
+        self.create_button_box()
 
         left_panel = QWidget()
         left_panel.setMinimumWidth(220)
@@ -89,7 +92,7 @@ class MeshColourmapView(QMainWindow):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.addWidget(top)
-        layout.addWidget(buttons)
+        layout.addWidget(self.button_box)
         self.setCentralWidget(content)
         self._set_model()
         QTimer.singleShot(0, self._initialize_preview)
@@ -151,36 +154,12 @@ class MeshColourmapView(QMainWindow):
         self.model.invert_field2 = self.invert_field2.isChecked()
         return self.model
 
-    def _button_clicked(self, button):
-        role = self.sender().buttonRole(button)
-        if role in (
-            QDialogButtonBox.ButtonRole.ApplyRole,
-            QDialogButtonBox.ButtonRole.AcceptRole,
-        ):
-            self._apply()
-        if role == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.close()
-
-    def _apply(self):
+    def apply_model(self):
         self.update_model()
         if self._on_apply is not None:
             self._on_apply(self.model)
         return self.model
 
-    def _cancel(self):
-        self.close()
-
-    def closeEvent(self, event):
-        window = self.parentWidget()
-        while window is not None and window.parentWidget() is not None:
-            window = window.parentWidget()
-        tabs = (
-            window.findChild(QTabWidget, "workspaceTabs")
-            if window is not None
-            else None
-        )
-        if tabs is not None:
-            index = tabs.indexOf(self)
-            if index >= 0:
-                tabs.removeTab(index)
-        super().closeEvent(event)
+    def _apply(self):
+        """Preserve the legacy direct-apply helper."""
+        return self.apply_model()
