@@ -66,6 +66,8 @@ class ProjectSerializer:
                 "colourmap_field_inversions": list(block.colourmap_field_inversions),
                 "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
             }
+            if hasattr(block, "filter_parameters"):
+                item["filter_parameters"] = dict(block.filter_parameters)
             if isinstance(mesh_object, GeneratedMesh):
                 grid_path = block.grid_serialised_path
                 item["grid_data"] = f"{BLOCK_DATA_DIRECTORY}/{grid_path.name}"
@@ -227,6 +229,8 @@ class ProjectSerializer:
                         comments=item.get("comments", ""),
                         load_data=item.get("in_scene", False),
                     )
+                if "filter_parameters" in item:
+                    block.filter_parameters = dict(item["filter_parameters"])
                 object_type = item.get("type", "mesh")
                 if object_type == "generated_mesh":
                     grid_data = block.grid_data
@@ -322,11 +326,19 @@ class ProjectSerializer:
                     and isinstance(child_block, PerlinNoiseTransformBlockObject)
                 ):
                     parent_block.set_perlin_noise_transform(child_block)
+                    parent_block.add_child_block_object(
+                        child_block,
+                        dependent=bool(reference.get("dependent", False)),
+                    )
                 elif (
                     isinstance(parent_block, ColourmapBlockObject)
                     and isinstance(child_block, PerlinNoiseTransformBlockObject)
                 ):
                     parent_block.set_perlin_noise_transform(child_block)
+                    parent_block.add_child_block_object(
+                        child_block,
+                        dependent=bool(reference.get("dependent", False)),
+                    )
                 elif isinstance(parent_block, MeshBlockObject) and isinstance(
                     child_block, ColourmapBlockObject
                 ):
@@ -349,6 +361,7 @@ class ProjectSerializer:
                         f"{transform_guid}"
                     )
                 parent_block.set_perlin_noise_transform(transform_block)
+                parent_block.add_child_block_object(transform_block)
             colourmap_guid = item.get("colourmap_reference")
             if colourmap_guid is not None and isinstance(
                 parent_block, MeshBlockObject
@@ -401,9 +414,9 @@ class ProjectSerializer:
         table_model.beginResetModel()
         table_model.table_manager.get_data().clear()
         table_model.endResetModel()
-        mesh_root.children.clear()
-        transform_root.children.clear()
-        colourmap_root.children.clear()
+        for root in (mesh_root, transform_root, colourmap_root):
+            for child in tuple(root.children):
+                root.remove_child(child)
         root_objects.nodes[:] = [mesh_root, transform_root, colourmap_root]
         if tree_model is not None:
             tree_model.endResetModel()

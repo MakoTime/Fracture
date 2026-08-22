@@ -75,6 +75,11 @@ class MeshFilterModel:
         )
         task.execute(task.prepare())
         filtered_block.add_child_block_object(source_block, dependent=True)
+        filtered_block.filter_parameters = {
+            "noise_minimum": self.noise_minimum,
+            "noise_maximum": self.noise_maximum,
+            "noise_penetration": self.noise_penetration,
+        }
         return MeshObject(
             name=filtered_block.name,
             mesh_data=task.mesh_data,

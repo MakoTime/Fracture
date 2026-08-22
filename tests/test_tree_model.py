@@ -78,3 +78,14 @@ def test_tree_object_removal_removes_child_aliases():
             root_objects.nodes.remove(parent)
         if transform_root in root_objects.nodes:
             root_objects.nodes.remove(transform_root)
+
+
+def test_destroying_parent_detaches_block_child_aliases():
+    transform = PerlinNoiseTransformModel(name="Shared").to_object()
+    parent_object = PerlinNoiseTransformModel(name="Parent").to_object()
+    parent_object.node.set_block_child_objects([transform])
+    stale_alias = parent_object.node.children[0]
+
+    parent_object.destroy()
+
+    assert stale_alias.parent is None

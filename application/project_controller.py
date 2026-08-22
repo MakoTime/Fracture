@@ -206,6 +206,9 @@ class ProjectController:
             self.table_model,
             self.window.scene_viewer,
         )
+        for controller in self.controllers:
+            if hasattr(controller, "bind_loaded_tasks"):
+                controller.bind_loaded_tasks(loaded)
         self.project_file = Path(project_file)
         return loaded
 

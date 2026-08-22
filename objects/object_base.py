@@ -142,7 +142,8 @@ class ObjectBase:
         self._table_manager = None
         self.remove_from_scene()
         self.remove_from_tree()
-        self.node.children.clear()
+        for child in tuple(self.node.children):
+            self.node.remove_child(child)
 
     def set_visible(self, visible: bool):
         """Update visibility through the same callback used by the table."""

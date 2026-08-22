@@ -16,7 +16,7 @@ from dialog.mesh_import.factory import (
 )
 from dialog.notify import create_notification
 from engine import EngineTask
-from engine.block_objects import MeshBlockObject
+from engine.block_objects import MeshBlockObject, PerlinNoiseTransformBlockObject
 from objects.colourmap import ColourmapObject
 from engine.block_tasks import GeneratedMeshTask, MeshFilterTask, MeshImportTask
 from engine.block_tasks import PerlinNoiseTransformTask
@@ -275,6 +275,57 @@ class MeshImportController:
             self.engine_runner.enqueue_block_task(
                 f"Regenerate {mesh_object.name}",
                 parent_task,
+            )
+
+    def bind_loaded_tasks(self, loaded_objects):
+        """Restore engine task bindings for meshes loaded from a project."""
+        for mesh_object in loaded_objects:
+            if not isinstance(mesh_object, MeshObject):
+                continue
+            if isinstance(mesh_object, GeneratedMesh):
+                self._bind_generated_mesh_tasks(mesh_object)
+                continue
+            block = mesh_object.mesh_block_object
+            parameters = getattr(block, "filter_parameters", None)
+            if not parameters:
+                continue
+            source_block = next(
+                (
+                    child
+                    for child in block.child_block_objects
+                    if isinstance(child, MeshBlockObject)
+                    and child is not block
+                ),
+                None,
+            )
+            transform_block = next(
+                (
+                    child
+                    for child in block.child_block_objects
+                    if isinstance(child, PerlinNoiseTransformBlockObject)
+                ),
+                None,
+            )
+            if source_block is None or transform_block is None:
+                continue
+            self.engine_runner.enqueue_block_task(
+                f"Configure {transform_block.name}",
+                PerlinNoiseTransformTask(transform_block),
+            )
+            task = MeshFilterTask(
+                source_block,
+                transform_block,
+                parameters["noise_minimum"],
+                parameters["noise_maximum"],
+                parameters["noise_penetration"],
+                block_object=block,
+            )
+            self.engine_runner.enqueue_block_task(
+                f"Filter {mesh_object.name}",
+                task,
+                on_finished=lambda finished, obj=mesh_object: self._finish_task(
+                    obj, finished
+                ),
             )
 
     def _finish_task(self, mesh_object, task):
