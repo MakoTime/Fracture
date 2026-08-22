@@ -4,6 +4,8 @@ from .mesh import MeshBlockObject
 from .base_block_object import BlockObject
 from .perlin_noise import PerlinNoiseTransformBlockObject
 from .transform import TransformBlockObject
+from .world_config import WorldConfigBlockObject
+from .island import IslandBlockObject
 
 __all__ = [
 	"BlockObject",
@@ -12,4 +14,6 @@ __all__ = [
 	"MeshBlockObject",
 	"PerlinNoiseTransformBlockObject",
 	"TransformBlockObject",
+	"WorldConfigBlockObject",
+	"IslandBlockObject",
 ]

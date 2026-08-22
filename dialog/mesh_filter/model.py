@@ -13,7 +13,6 @@ class MeshFilterModel:
     noise_enabled: bool = False
     noise_minimum: float = 0.25
     noise_maximum: float = 0.75
-    noise_penetration: int = 1
     perlin_noise_transform: object | None = None
 
     @classmethod
@@ -49,7 +48,6 @@ class MeshFilterModel:
             self._transform_block(),
             self.noise_minimum,
             self.noise_maximum,
-            self.noise_penetration,
         )
         task.execute(task.prepare())
         return task.mesh_data
@@ -70,7 +68,6 @@ class MeshFilterModel:
             transform_block,
             self.noise_minimum,
             self.noise_maximum,
-            self.noise_penetration,
             block_object=filtered_block,
         )
         task.execute(task.prepare())
@@ -78,7 +75,6 @@ class MeshFilterModel:
         filtered_block.filter_parameters = {
             "noise_minimum": self.noise_minimum,
             "noise_maximum": self.noise_maximum,
-            "noise_penetration": self.noise_penetration,
         }
         return MeshObject(
             name=filtered_block.name,

@@ -12,7 +12,8 @@ class BaseColumn(Enum):
     Visible = 1
     Object = 2
     Progress = 3
-    Other = 4
+    Shapes = 4
+    Other = Shapes
     Remove = 5
 
 
@@ -55,8 +56,9 @@ class TableManager:
 
 
 class TableModel(QAbstractTableModel):
-    NAME, VISIBLE, OBJECT, PROGRESS, OTHER, REMOVE = range(6)
-    Headers = ["Name", "Visible", "Object", "Progress", "Other", "Remove"]
+    NAME, VISIBLE, OBJECT, PROGRESS, SHAPES, REMOVE = range(6)
+    OTHER = SHAPES
+    Headers = ["Name", "Visible", "Object", "Progress", "Shapes", "Remove"]
 
     def __init__(self, table_manager: TableManager):
         super().__init__()
@@ -125,8 +127,12 @@ class TableModel(QAbstractTableModel):
                 return row_data.obj.obj
             if column == self.PROGRESS:
                 return row_data.progress.value
-            if column == self.OTHER:
-                return row_data.other
+            if column == self.SHAPES:
+                return getattr(
+                    row_data.obj.obj,
+                    "shape_interface",
+                    row_data.other,
+                )
             if column == self.REMOVE:
                 return "Remove"
         elif role == Qt.DecorationRole:

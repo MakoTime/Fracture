@@ -7,6 +7,7 @@ __all__ = [
     "ColourmapController",
     "ObjectImporterModel",
     "TransformController",
+    "WorldConfigController",
     "register_import_binding",
 ]
 
@@ -24,4 +25,8 @@ def __getattr__(name):
         from .transform_controller import TransformController
 
         return TransformController
+    if name == "WorldConfigController":
+        from .world_config_controller import WorldConfigController
+
+        return WorldConfigController
     raise AttributeError(name)

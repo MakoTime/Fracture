@@ -271,7 +271,9 @@ class EngineTaskModel(QObject):
             return
         if any(not child.is_valid() for child in block_object.child_block_objects):
             return
-        binding["task"].process(binding["prepared"], progress_callback)
+        binding["result"] = binding["task"].process(
+            binding["prepared"], progress_callback
+        )
 
     @staticmethod
     def _task_is_active(task):
@@ -296,6 +298,12 @@ class EngineTaskModel(QObject):
     def _block_task_finished(self, binding, task):
         if not binding["active"]:
             return
+        if task.status is TaskStatus.COMPLETED:
+            try:
+                binding["task"].block_object.commit(binding.get("result"))
+            except Exception as error:
+                task.error = str(error)
+                task.status = TaskStatus.FAILED
         if binding["on_finished"] is not None:
             binding["on_finished"](task)
         binding["engine_task"] = None

@@ -49,8 +49,6 @@ class MeshFilterView(TabEditorView):
             control.setRange(0.0, 1.0)
             control.setDecimals(3)
             control.setSingleStep(0.01)
-        self.penetration = QSpinBox()
-        self.penetration.setRange(1, 64)
         self.name = QLineEdit()
         self.name.setPlaceholderText("Filtered Mesh")
         self.name.setAccessibleName("New filtered mesh name")
@@ -67,7 +65,6 @@ class MeshFilterView(TabEditorView):
             self.enabled,
             self.minimum,
             self.maximum,
-            self.penetration,
         ):
             signal = getattr(control, "toggled", None) or control.valueChanged
             if control is self.enabled:
@@ -99,7 +96,6 @@ class MeshFilterView(TabEditorView):
         form.addRow("Enabled", self.enabled)
         form.addRow("Minimum contour", self.minimum)
         form.addRow("Maximum contour", self.maximum)
-        form.addRow("Penetration", self.penetration)
         group = QGroupBox("Smoothing and Noise")
         group.setLayout(form)
 
@@ -137,7 +133,6 @@ class MeshFilterView(TabEditorView):
         self.enabled.setChecked(self.model.noise_enabled)
         self.minimum.setValue(self.model.noise_minimum)
         self.maximum.setValue(self.model.noise_maximum)
-        self.penetration.setValue(self.model.noise_penetration)
         self.transform_status.setText(
             "No filter transform selected"
             if not self.model.has_transform
@@ -149,7 +144,6 @@ class MeshFilterView(TabEditorView):
         self.model.noise_enabled = self.enabled.isChecked()
         self.model.noise_minimum = self.minimum.value()
         self.model.noise_maximum = self.maximum.value()
-        self.model.noise_penetration = self.penetration.value()
         return self.model
 
     def _transform_changed(self):

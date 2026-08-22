@@ -7,7 +7,14 @@ from PySide6.QtWidgets import QWidget
 
 from components.table import TableManager, TableModel
 from components.tree import TreeModel
-from components.tree.roots import colourmap_root, mesh_root, root_objects, transform_root
+from components.tree.roots import (
+    colourmap_root,
+    island_root,
+    mesh_root,
+    root_objects,
+    transform_root,
+    world_config,
+)
 from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_generate import GenerateMeshWindow, MeshGenerateModel
 from dialog.mesh_mask import SurfaceMaskModel
@@ -16,6 +23,7 @@ from dialog.mesh_edit.model import MeshEditModel
 from engine.block_objects import MeshBlockObject
 from engine.block_tasks import MeshImportTask
 from engine.block_tasks import MeshGenerateTask
+from engine.block_tasks import MeshFilterTask
 from engine.block_tasks.generated_mesh import GeneratedMeshTask
 from engine.block_objects import GeneratedMeshBlockObject
 from objects.mesh_object import MeshObject
@@ -23,10 +31,13 @@ from objects.generated_mesh import GeneratedMesh
 from application.importers import MeshImportController, ObjectImporterModel
 from application.importers import TransformController
 from application.importers import ColourmapController
+from application.importers.world_config_controller import WorldConfigController
+from application.importers.island_controller import IslandController
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from dialog.mesh_filter import MeshFilterModel
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from objects.object_base import ObjectBase
+from components.scene import ShapeController
 
 
 def _perlin_transform(size=4, seed=0, amplitude=1.0):
@@ -123,6 +134,15 @@ def test_colourmap_root_menu_includes_new_action(qapp):
     menu = controller.create_context_menu(colourmap_root)
 
     assert [action.text() for action in menu.actions()] == ["New Colourmap"]
+
+
+def test_world_config_menu_only_allows_editing(qapp):
+    controller = WorldConfigController(tree_view=SimpleNamespace())
+
+    menu = controller.create_context_menu(world_config.node)
+
+    assert [action.text() for action in menu.actions()] == ["Edit"]
+    assert not root_objects.remove(world_config.node)
 
 
 def test_perlin_transform_registration_enqueues_block_task(qapp):
@@ -663,6 +683,49 @@ def test_mesh_filter_returns_regular_mesh_with_baked_dependencies():
     )
 
 
+def test_mesh_filter_surface_displacement_modifies_the_marching_cubes_grid():
+    source = GeneratedMesh(
+        "Source",
+        grid_data=np.random.default_rng(4).random((8, 8, 8)),
+    )
+    transform = _perlin_transform(size=4, seed=9)
+    transform.block_object.update_configuration(
+        application_mode="surface_displacement"
+    )
+    task = MeshFilterTask(
+        source.mesh_block_object,
+        transform.block_object,
+        0.25,
+        0.75,
+    )
+
+    task.execute(task.prepare())
+
+    assert task.mesh_data.n_points > 0
+    assert task.mesh_data.n_cells > 0
+    assert not np.array_equal(task.grid_data, source.grid_data)
+
+
+def test_mesh_filter_noise_mask_removes_values_outside_noise_range():
+    source = GeneratedMesh(
+        "Source",
+        grid_data=np.ones((8, 8, 8)),
+    )
+    transform = _perlin_transform(size=4, seed=9)
+    transform.block_object.update_configuration(application_mode="noise_mask")
+    task = MeshFilterTask(
+        source.mesh_block_object,
+        transform.block_object,
+        0.49,
+        0.51,
+    )
+
+    task.execute(task.prepare())
+
+    assert np.any(task.grid_data == 0.0)
+    assert np.any(task.grid_data == 1.0)
+
+
 def test_mesh_filter_uses_source_transform_without_invalidating_source_mesh():
     transform = _perlin_transform(size=4)
     source = GeneratedMesh(
@@ -932,6 +995,51 @@ def test_table_visibility_controls_scene_actor(qapp):
     ]
 
 
+def test_shape_controller_attaches_table_interface_and_owns_shapes():
+    class FakeScene:
+        def __init__(self):
+            self.added = []
+            self.removed = []
+
+        def add_shape(self, object_base, shape):
+            self.added.append((object_base, shape))
+
+        def remove_shape(self, object_base, shape):
+            self.removed.append((object_base, shape))
+            return True
+
+    class FakeTable:
+        def __init__(self):
+            self.refreshed = []
+
+        def refresh_object(self, object_base):
+            self.refreshed.append(object_base)
+
+    object_base = ObjectBase("Shape owner")
+    scene = FakeScene()
+    table = FakeTable()
+    table_model = TableModel(TableManager())
+    table_model.add_row(object_base.row_data)
+    controller = ShapeController(scene, table)
+    controller.attach(object_base)
+
+    shape = object_base.shape_interface.add_line([(0, 0, 0), (1, 0, 0)])
+
+    assert TableModel.Headers[TableModel.SHAPES] == "Shapes"
+    assert table_model.data(
+        table_model.index(0, TableModel.SHAPES),
+        Qt.DisplayRole,
+    ) is object_base.shape_interface
+    assert object_base.row_data.other is object_base.shape_interface
+    assert object_base.shape_interface.shapes == (shape,)
+    assert str(object_base.shape_interface) == "Shapes (1)"
+    assert scene.added == [(object_base, shape)]
+    assert table.refreshed == [object_base]
+
+    object_base.shape_interface.clear()
+    assert scene.removed == [(object_base, shape)]
+
+
 def test_table_remove_unloads_object_but_keeps_tree_node(qapp):
     class FakeScene:
         def __init__(self):
@@ -957,6 +1065,45 @@ def test_table_remove_unloads_object_but_keeps_tree_node(qapp):
     assert table_model.rowCount() == 0
     assert scene.objects == []
     assert object_base.node in root_objects.get_nodes()
+
+
+def test_island_delete_refreshes_tree_model_after_removal():
+    class FakeTreeModel:
+        def __init__(self):
+            self.refresh_count = 0
+
+        def refresh(self):
+            self.refresh_count += 1
+
+    class FakeTreeView:
+        def __init__(self, model):
+            self._model = model
+
+        def model(self):
+            return self._model
+
+    class FakeImporter:
+        def confirm_remove(self, object_base, parent=None):
+            return True
+
+        def remove(self, object_base):
+            island_root.remove_child(object_base.node)
+            return object_base
+
+    object_base = ObjectBase("Island", auto_register_root=False)
+    island_root.add_child(object_base.node)
+    model = FakeTreeModel()
+    controller = IslandController(
+        object_importer=FakeImporter(),
+        tree_view=FakeTreeView(model),
+    )
+
+    try:
+        assert controller.delete(object_base) is object_base
+        assert object_base.node not in island_root.children
+        assert model.refresh_count == 1
+    finally:
+        object_base.remove_from_tree()
 
 
 def test_show_mesh_restores_scene_and_table_pipeline(qapp):

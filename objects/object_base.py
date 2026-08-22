@@ -6,7 +6,8 @@ from uuid import uuid4
 from PySide6.QtGui import QIcon
 
 from components.table import CellObject, NormalizedProgressBar, RowData, VisibleField
-from components.tree import TreeNode, root_objects
+from components.tree.model import TreeNode
+from components.tree.roots.root_objects import root_objects
 
 
 class ObjectBase:
@@ -140,6 +141,12 @@ class ObjectBase:
         ):
             self._table_manager.remove_object(self)
         self._table_manager = None
+        shape_controller = getattr(self, "shape_controller", None)
+        if shape_controller is not None and hasattr(shape_controller, "clear"):
+            shape_controller.clear(self)
+        timer_controller = getattr(self, "timer_controller", None)
+        if timer_controller is not None and hasattr(timer_controller, "detach"):
+            timer_controller.detach(self)
         self.remove_from_scene()
         self.remove_from_tree()
         for child in tuple(self.node.children):

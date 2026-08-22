@@ -79,6 +79,16 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.preset_field = QComboBox()
         self.preset_field.addItems(self.PRESETS)
         self.preset_field.setCurrentText(self.model.preset)
+        self.application_field = QComboBox()
+        self.application_field.addItem("Surface displacement", "surface_displacement")
+        self.application_field.addItem("Voxel remesh", "voxel_remesh")
+        self.application_field.addItem("Noise mask", "noise_mask")
+        self.application_field.setCurrentIndex(
+            max(0, self.application_field.findData(self.model.application_mode))
+        )
+        self.penetration_field = QSpinBox()
+        self.penetration_field.setRange(1, 64)
+        self.penetration_field.setValue(self.model.penetration)
         self.option_fields = {}
         self.options_layout = QFormLayout()
         self._build_preset_options()
@@ -127,6 +137,8 @@ class PerlinNoiseTransformView(PopupEditorView):
         basic_form.addRow("Max amplitude", self.max_amplitude_field)
         basic_form.addRow("Seed", self.seed_field)
         basic_form.addRow("Preset", self.preset_field)
+        basic_form.addRow("Apply noise as", self.application_field)
+        basic_form.addRow("Penetration", self.penetration_field)
         group = QGroupBox("Perlin noise bands")
         group.setLayout(basic_form)
 
@@ -383,6 +395,8 @@ class PerlinNoiseTransformView(PopupEditorView):
                 manual_sampling=self.manual_sampling_field.isChecked(),
                 preset=self.preset_field.currentText(),
                 preset_options={name: field.value() for name, field in self.option_fields.items()},
+                application_mode=self.application_field.currentData(),
+                penetration=self.penetration_field.value(),
             )
         except (TypeError, ValueError):
             return

@@ -100,6 +100,8 @@ class TransformController:
             manual_sampling=block.manual_sampling,
             preset=block.preset,
             preset_options=block.preset_options,
+            application_mode=block.application_mode,
+            penetration=block.penetration,
         )
         dialog = create_perlin_noise_transform_dialog(model, parent=self.parent)
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -121,6 +123,8 @@ class TransformController:
                     "manual_sampling",
                     "preset",
                     "preset_options",
+                    "application_mode",
+                    "penetration",
                 )
             }
         )

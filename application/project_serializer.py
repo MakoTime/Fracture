@@ -1,22 +1,27 @@
 import json
 from pathlib import Path
+import pyvista as pv
 
 from components.tree.roots import (
     colourmap_root,
+    island_root,
     mesh_root,
     root_objects,
     transform_root,
+    world_config,
 )
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from engine.block_objects import (
     ColourmapBlockObject,
     GeneratedMeshBlockObject,
+    IslandBlockObject,
     MeshBlockObject,
     PerlinNoiseTransformBlockObject,
 )
 from objects.generated_mesh import GeneratedMesh
 from objects.colourmap import ColourmapObject
 from objects.mesh_object import MeshObject
+from objects.island import Island
 from application.project_version import CURRENT_PROJECT_VERSION, upgrade_project_data
 
 
@@ -96,6 +101,8 @@ class ProjectSerializer:
                 manual_sampling=transform.block_object.manual_sampling,
                 preset=transform.block_object.preset,
                 preset_options=transform.block_object.preset_options,
+                application_mode=transform.block_object.application_mode,
+                penetration=transform.block_object.penetration,
             ).to_json()
             item["comments"] = transform.block_object.comments
             item["parent_guid"] = self._parent_guid(node)
@@ -131,7 +138,34 @@ class ProjectSerializer:
             )
             objects.append(item)
 
-        data = {"version": CURRENT_PROJECT_VERSION, "objects": objects}
+        for node in self._walk_nodes(island_root):
+            island = node.node_object
+            if not isinstance(island, Island):
+                raise TypeError(f"Unsupported project object: {type(island).__name__}")
+            block = island.block_object
+            block_path = block.serialise_to_directory(block_directory)
+            objects.append({
+                "type": "island",
+                "guid": block.guid,
+                "name": block.name,
+                "comments": block.comments,
+                "visible": island.visible,
+                "in_scene": island in scene_viewer.scene_model.objects,
+                "parent_guid": self._parent_guid(node),
+                "child_references": self._child_references(block),
+                "core_offset": block.core_offset,
+                "orbit_speed": block.orbit_speed,
+                "orbit_normal": block.orbit_normal,
+                "orbit_angle": block.orbit_angle,
+                "curve_mesh": block.curve_mesh,
+                "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
+            })
+
+        data = {
+            "version": CURRENT_PROJECT_VERSION,
+            "objects": objects,
+            "world_config": world_config.block_object.to_json(),
+        }
         directory.mkdir(parents=True, exist_ok=True)
         project_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return project_file
@@ -156,17 +190,37 @@ class ProjectSerializer:
             tree_model,
         )
         loaded = {}
-        pending = list(data.get("objects", []))
+        loaded[world_config.guid] = world_config
+        pending = []
+        saved_world_config = data.get("world_config")
+        if saved_world_config is not None:
+            world_config.update_configuration(
+                name=saved_world_config.get("name", world_config.name),
+                centre=tuple(
+                    saved_world_config.get("centre", world_config.centre)
+                ),
+            )
+        for item in data.get("objects", []):
+            if item.get("type") == "world_config":
+                world_config.update_configuration(
+                    name=item.get("name", world_config.name),
+                    centre=tuple(item.get("centre", world_config.centre)),
+                )
+            else:
+                pending.append(item)
         while pending:
             remaining = []
             for item in pending:
                 is_transform = item.get("type") == "perlin_noise_transform"
                 is_colourmap = item.get("type") == "colourmap"
+                is_island = item.get("type") == "island"
                 default_parent = (
                     transform_root
                     if is_transform
                     else colourmap_root
                     if is_colourmap
+                    else island_root
+                    if is_island
                     else mesh_root
                 )
                 parent = (
@@ -205,6 +259,39 @@ class ProjectSerializer:
                         add_to_scene=False,
                     )
                     loaded[colourmap.guid] = colourmap
+                    continue
+                if is_island:
+                    block = IslandBlockObject(
+                        mesh_data=(
+                            pv.read(str(project_path.parent / item["block_data"]))
+                            if item.get("in_scene", False)
+                            else None
+                        ),
+                        name=item["name"],
+                        guid=item["guid"],
+                        comments=item.get("comments", ""),
+                        world_config=world_config.block_object,
+                        core_offset=item.get("core_offset", 0.0),
+                        orbit_speed=item.get("orbit_speed", 0.0),
+                        orbit_normal=item.get("orbit_normal", (0.0, 0.0, 1.0)),
+                        orbit_angle=item.get("orbit_angle", 0.0),
+                        curve_mesh=item.get("curve_mesh", False),
+                        serialised_path=project_path.parent / item["block_data"],
+                    )
+                    island = Island(
+                        name=item["name"],
+                        block_object=block,
+                        comments=item.get("comments", ""),
+                        visible=item.get("visible", True),
+                        guid=item["guid"],
+                        auto_register_root=False,
+                    )
+                    object_importer.register(
+                        island,
+                        parent=parent,
+                        add_to_scene=item.get("in_scene", False),
+                    )
+                    loaded[island.guid] = island
                     continue
                 block_path = project_path.parent / item["block_data"]
                 block_class = (
@@ -343,6 +430,12 @@ class ProjectSerializer:
                     child_block, ColourmapBlockObject
                 ):
                     parent_block.set_colourmap(child_block)
+                elif isinstance(parent_block, IslandBlockObject) and isinstance(
+                    child_block, MeshBlockObject
+                ):
+                    parent_block.set_mesh_block(child_block)
+                elif isinstance(parent_block, IslandBlockObject) and child_block is world_config.block_object:
+                    parent_block.set_world_config(child_block)
                 else:
                     parent_block.add_child_block_object(
                         child_block,
@@ -401,7 +494,7 @@ class ProjectSerializer:
         if engine_runner is not None and hasattr(engine_runner, "clear"):
             engine_runner.clear()
         objects = []
-        for root in (mesh_root, transform_root, colourmap_root):
+        for root in (mesh_root, transform_root, colourmap_root, island_root):
             objects.extend(
                 node.node_object
                 for node in ProjectSerializer._walk_nodes(root)
@@ -414,9 +507,15 @@ class ProjectSerializer:
         table_model.beginResetModel()
         table_model.table_manager.get_data().clear()
         table_model.endResetModel()
-        for root in (mesh_root, transform_root, colourmap_root):
+        for root in (mesh_root, transform_root, colourmap_root, island_root):
             for child in tuple(root.children):
                 root.remove_child(child)
-        root_objects.nodes[:] = [mesh_root, transform_root, colourmap_root]
+        root_objects.nodes[:] = [
+            mesh_root,
+            transform_root,
+            colourmap_root,
+            island_root,
+            world_config.node,
+        ]
         if tree_model is not None:
             tree_model.endResetModel()

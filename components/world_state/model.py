@@ -1,6 +1,6 @@
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
-from components.tree.roots import root_objects
+from components.tree.roots import root_objects, world_config
 
 
 class WorldStateModel(QAbstractTableModel):
@@ -30,7 +30,11 @@ class WorldStateModel(QAbstractTableModel):
         return self.rows[index.row()][index.column()]
 
     def refresh(self):
-        objects = list(self._walk_nodes(root_objects.get_nodes()))
+        objects = [
+            object_base
+            for object_base in self._walk_nodes(root_objects.get_nodes())
+            if object_base is not world_config
+        ]
         scene_objects = list(self.scene_model.objects) if self.scene_model else []
         visible_objects = [obj for obj in scene_objects if getattr(obj, "visible", False)]
         rows = [

@@ -18,6 +18,7 @@ class SceneViewer(QWidget):
         super().__init__(parent)
         self.scene_model = scene_model or SceneModel()
         self._actors = {}
+        self._shape_actors = {}
         self._show_sky_dome = show_sky_dome
         self.sky_dome = SkyDome()
         self.plotter = QtInteractor(self)
@@ -146,7 +147,6 @@ class SceneViewer(QWidget):
 
     def _render_pan_frame(self):
         self._pan_render_pending = False
-        self._reset_clipping_range()
         self.plotter.render()
 
     def _display_delta_to_world(self, delta):
@@ -193,7 +193,7 @@ class SceneViewer(QWidget):
                 split_vertices=False,
                 inplace=False,
             )
-            if block_object is not None:
+            if block_object is not None and hasattr(block_object, "set_mesh_data"):
                 block_object.set_mesh_data(payload)
 
         if hasattr(payload, "compute_normals") and "Normals" not in payload.point_data:
@@ -202,7 +202,7 @@ class SceneViewer(QWidget):
                 split_vertices=False,
                 inplace=False,
             )
-            if block_object is not None:
+            if block_object is not None and hasattr(block_object, "set_mesh_data"):
                 block_object.set_mesh_data(payload)
 
         colour_scalars = None
@@ -265,6 +265,47 @@ class SceneViewer(QWidget):
         """Rebuild an object's actor after its optional colourmap changes."""
         return self.refresh_object(object_base)
 
+    def add_shape(self, object_base, shape):
+        """Render a lightweight shape without adding it to scene objects."""
+        from objects.shape import Shape
+
+        if not isinstance(shape, Shape):
+            raise TypeError("shape must be a Shape")
+        key = (object_base, id(shape))
+        self.remove_shape(object_base, shape)
+        if shape.kind == "text":
+            value, position = shape.data
+            actor = self.plotter.add_point_labels(
+                [position], [str(value)], **shape.style
+            )
+        else:
+            if shape.kind == "line":
+                payload = pv.lines_from_points(shape.data, close=False)
+            elif shape.kind == "mesh":
+                payload = shape.data
+            else:
+                raise ValueError(f"Unsupported shape kind: {shape.kind}")
+            actor = self.plotter.add_mesh(payload, **shape.style)
+        actor.SetVisibility(bool(shape.visible))
+        self._shape_actors[key] = actor
+        self.plotter.render()
+        return actor
+
+    def remove_shape(self, object_base, shape):
+        key = (object_base, id(shape))
+        actor = self._shape_actors.pop(key, None)
+        if actor is None:
+            return False
+        self.plotter.remove_actor(actor)
+        self.plotter.render()
+        return True
+
+    def remove_object_shapes(self, object_base):
+        for key, actor in tuple(self._shape_actors.items()):
+            if key[0] is object_base:
+                self._shape_actors.pop(key)
+                self.plotter.remove_actor(actor)
+
     def refresh_object(self, object_base):
         """Rebuild an existing actor from the object's current block data."""
         if object_base not in self._actors:
@@ -278,6 +319,7 @@ class SceneViewer(QWidget):
         return True
 
     def remove_object(self, object_base: Any):
+        self.remove_object_shapes(object_base)
         actor = self._actors.pop(object_base, None)
         if actor is None:
             return False
@@ -294,6 +336,16 @@ class SceneViewer(QWidget):
         self.plotter.render()
         return True
 
+    def set_object_transform(self, object_base: Any, transform):
+        actor = self._actors.get(object_base)
+        if actor is None:
+            return False
+        from components.timer import as_vtk_matrix
+
+        actor.SetUserMatrix(as_vtk_matrix(transform))
+        self.plotter.render()
+        return True
+
     def clear_scene(self):
         self.plotter.clear()
         if self._show_sky_dome:
@@ -301,6 +353,7 @@ class SceneViewer(QWidget):
             self.sky_dome.add_to(self.plotter)
         self._restore_lighting()
         self._actors.clear()
+        self._shape_actors.clear()
         self.scene_model.clear()
         self.plotter.show_axes()
         self.plotter.render()

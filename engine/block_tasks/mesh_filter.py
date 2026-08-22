@@ -11,14 +11,12 @@ class MeshFilterTask:
         transform_block,
         minimum,
         maximum,
-        penetration,
         block_object=None,
     ):
         self.source_block = source_block
         self.transform_block = transform_block
         self.minimum = float(minimum)
         self.maximum = float(maximum)
-        self.penetration = max(1, int(penetration))
         self.block_object = block_object
         self.grid_data = None
         self.mesh_data = None
@@ -27,7 +25,10 @@ class MeshFilterTask:
         return {
             "minimum": self.minimum,
             "maximum": self.maximum,
-            "penetration": self.penetration,
+            "penetration": max(1, int(self.transform_block.penetration)),
+            "application_mode": getattr(
+                self.transform_block, "application_mode", "voxel_remesh"
+            ),
             "transform": self.transform_block.prepare(),
         }
 
@@ -59,13 +60,30 @@ class MeshFilterTask:
         ):
             raise ValueError("a filter transform is required")
         active = values != 0.0
-        distance = self._surface_distance(active, prepared["penetration"])
-        affected = distance >= 0
         noise = self.transform_block._build_noise_field(
             values.shape,
             prepared["transform"],
         )
         contour_level = max(prepared["minimum"], prepared["maximum"])
+        if prepared["application_mode"] == "noise_mask":
+            minimum = min(prepared["minimum"], prepared["maximum"])
+            maximum = max(prepared["minimum"], prepared["maximum"])
+            values[active & ((noise < minimum) | (noise > maximum))] = 0.0
+            return values
+        if prepared["application_mode"] == "surface_displacement":
+            active = values >= contour_level
+            distance = self._signed_surface_distance(
+                active,
+                prepared["penetration"],
+            )
+            affected = distance != 0
+            values[affected] = contour_level + (
+                distance[affected] / prepared["penetration"]
+                - (noise[affected] - 0.5)
+            )
+            return values
+        distance = self._surface_distance(active, prepared["penetration"])
+        affected = distance >= 0
         values[affected] = contour_level + (
             distance[affected] / prepared["penetration"] - (noise[affected] - 0.5)
         )
@@ -102,6 +120,16 @@ class MeshFilterTask:
             expanded |= padded[1:-1, 1:-1, 2:]
             frontier = expanded & active & (distance < 0)
             distance[frontier] = layer
+        return distance
+
+    @classmethod
+    def _signed_surface_distance(cls, active, penetration):
+        active = np.asarray(active, dtype=bool)
+        inside = cls._surface_distance(active, penetration)
+        outside = cls._surface_distance(~active, penetration)
+        distance = np.zeros(active.shape, dtype=float)
+        distance[inside >= 0] = inside[inside >= 0] + 0.5
+        distance[outside >= 0] = -(outside[outside >= 0] + 0.5)
         return distance
 
     @staticmethod

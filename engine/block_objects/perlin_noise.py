@@ -26,6 +26,12 @@ class PerlinPrepared:
 class PerlinNoiseTransformBlockObject(TransformBlockObject):
     """Apply one or more seeded Perlin frequency bands to a scalar field."""
 
+    APPLICATION_MODES = (
+        "surface_displacement",
+        "voxel_remesh",
+        "noise_mask",
+    )
+
     frequencies: tuple[int, ...] = (4,)
     amplitudes: tuple[float, ...] = (1.0,)
     seed: int = 0
@@ -38,6 +44,8 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
     manual_sampling: bool = False
     preset: str = "Manual"
     preset_options: dict = field(default_factory=dict)
+    application_mode: str = "voxel_remesh"
+    penetration: int = 1
 
     __hash__ = TransformBlockObject.__hash__
 
@@ -56,6 +64,11 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
         )
         self.manual_sampling = bool(self.manual_sampling)
         self.preset_options = dict(self.preset_options)
+        self.penetration = max(1, int(self.penetration))
+        if self.application_mode not in self.APPLICATION_MODES:
+            raise ValueError(
+                f"application_mode must be one of {self.APPLICATION_MODES}"
+            )
         if len(self.frequencies) != len(self.amplitudes):
             raise ValueError("frequencies and amplitudes must have equal lengths")
         if not self.frequencies or any(value < 1 for value in self.frequencies):
@@ -74,6 +87,10 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             raise ValueError("curve_mode must be discrete or bezier")
         if self.frequency_start >= self.frequency_end:
             raise ValueError("frequency_start must be below frequency_end")
+        if self.application_mode not in self.APPLICATION_MODES:
+            raise ValueError(
+                f"application_mode must be one of {self.APPLICATION_MODES}"
+            )
         return PerlinPrepared(
             frequencies=tuple(self.frequencies),
             amplitudes=tuple(self.amplitudes),
@@ -113,6 +130,8 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             "manual_sampling",
             "preset",
             "preset_options",
+            "application_mode",
+            "penetration",
         }
         unknown = set(values) - allowed
         if unknown:
@@ -121,6 +140,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             setattr(self, name, value)
         self.frequencies = tuple(int(value) for value in self.frequencies)
         self.amplitudes = tuple(float(value) for value in self.amplitudes)
+        self.penetration = max(1, int(self.penetration))
         self.prepare()
         self.mark_changed()
         return self
@@ -172,6 +192,8 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
                     "manual_sampling": self.manual_sampling,
                     "preset": self.preset,
                     "preset_options": self.preset_options,
+                    "application_mode": self.application_mode,
+                    "penetration": self.penetration,
                 },
                 indent=2,
             ),

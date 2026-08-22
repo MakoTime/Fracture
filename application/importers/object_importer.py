@@ -13,6 +13,11 @@ class ObjectImporterModel:
         self.tree_manager = tree_manager
         self.scene_viewer = scene_viewer
         self.block_data_directory = None
+        from components.scene import ShapeController
+        from components.timer import TimerController
+
+        self.shape_controller = ShapeController(scene_viewer, table_model)
+        self.timer_controller = TimerController(scene_viewer)
 
     def persist_block(self, block_object):
         """Persist a processed block when the active project has storage."""
@@ -37,6 +42,8 @@ class ObjectImporterModel:
             object_base._importer_destruction_callback = remove_table_row
             block.add_destruction_callback(remove_table_row)
         object_base.add_to_tree(self.tree_manager, parent=parent)
+        self.shape_controller.attach(object_base)
+        self.timer_controller.attach(object_base)
         if not add_to_scene:
             return object_base
         object_base.register(

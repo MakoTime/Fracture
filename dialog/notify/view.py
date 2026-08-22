@@ -20,10 +20,10 @@ class NotifyView(QDialog):
         super().__init__(parent)
         self.selected_action = None
         self.setWindowTitle("Notification")
-        self.resize(420, 220)
+        self.resize(380, 180)
 
         self.notify_icon = QLabel()
-        self.notify_icon.setFixedSize(40, 40)
+        self.notify_icon.setFixedSize(32, 32)
         self.notify_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.notify_icon.setScaledContents(True)
 
@@ -32,12 +32,12 @@ class NotifyView(QDialog):
         self.title.setStyleSheet("font-size: 12pt; font-weight: 600;")
 
         header_layout = QHBoxLayout()
-        header_layout.setSpacing(10)
+        header_layout.setSpacing(8)
         header_layout.addWidget(self.notify_icon)
         header_layout.addWidget(self.title, 1)
 
         self.content = QLabel()
-        self.content.setMinimumHeight(56)
+        self.content.setMinimumHeight(40)
         self.content.setWordWrap(True)
         self.content.setAlignment(
             Qt.AlignmentFlag.AlignLeading | Qt.AlignmentFlag.AlignTop
@@ -55,8 +55,8 @@ class NotifyView(QDialog):
         self.button_box.rejected.connect(self.reject)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(14, 14, 14, 12)
+        layout.setSpacing(8)
         layout.addLayout(header_layout)
         layout.addWidget(self.content, 1)
         layout.addWidget(self.button_box)

@@ -14,6 +14,8 @@ from menu import setup_menu
 from application.importers import ObjectImporterModel
 from application.importers.transform_controller import TransformController
 from application.importers.colourmap_controller import ColourmapController
+from application.importers.world_config_controller import WorldConfigController
+from application.importers.island_controller import IslandController
 from application.project_serializer import ProjectSerializer
 
 
@@ -55,6 +57,9 @@ class ProjectController:
             tree_manager=self.tree_manager,
             scene_viewer=self.window.scene_viewer,
         )
+        self.window.worldStateView.timer_controller = (
+            self.object_importer.timer_controller
+        )
         self.object_importer.engine_runner = self.window.engine_runner
         self.window.object_importer = self.object_importer
         self.controllers.extend(
@@ -74,6 +79,20 @@ class ProjectController:
         )
         self.controllers.append(
             ColourmapController(
+                object_importer=self.object_importer,
+                tree_view=self.window.treeWidget,
+                parent=self.window,
+                engine_runner=self.window.engineRunner,
+            )
+        )
+        self.controllers.append(
+            WorldConfigController(
+                tree_view=self.window.treeWidget,
+                parent=self.window,
+            )
+        )
+        self.controllers.append(
+            IslandController(
                 object_importer=self.object_importer,
                 tree_view=self.window.treeWidget,
                 parent=self.window,
@@ -169,6 +188,9 @@ class ProjectController:
 
     def create_project(self, project_file):
         """Create an empty project and make it the active save target."""
+        timer_controller = getattr(self.object_importer, "timer_controller", None)
+        if timer_controller is not None:
+            timer_controller.clear()
         self.project_serializer._clear_current_project(
             self.table_model,
             self.window.scene_viewer,
@@ -188,6 +210,9 @@ class ProjectController:
         """Close the active project and release its registered work."""
         if save:
             self.save_project()
+        timer_controller = getattr(self.object_importer, "timer_controller", None)
+        if timer_controller is not None:
+            timer_controller.clear()
         self.project_serializer._clear_current_project(
             self.table_model,
             self.window.scene_viewer,

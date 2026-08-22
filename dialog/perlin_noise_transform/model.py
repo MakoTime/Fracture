@@ -24,6 +24,8 @@ class PerlinNoiseTransformModel(EditorModel):
     manual_sampling: bool = False
     preset: str = "Manual"
     preset_options: dict = field(default_factory=dict)
+    application_mode: str = "voxel_remesh"
+    penetration: int = 1
 
     def __post_init__(self):
         self.frequencies = tuple(int(value) for value in self.frequencies)
@@ -39,6 +41,7 @@ class PerlinNoiseTransformModel(EditorModel):
         )
         self.sample_count = max(1, int(self.sample_count))
         self.manual_sampling = bool(self.manual_sampling)
+        self.penetration = max(1, int(self.penetration))
         self._validate()
 
     def _validate(self):
@@ -52,6 +55,12 @@ class PerlinNoiseTransformModel(EditorModel):
             raise ValueError("curve_mode must be discrete or bezier")
         if self.frequency_start >= self.frequency_end:
             raise ValueError("frequency_start must be below frequency_end")
+        if self.application_mode not in (
+            "surface_displacement",
+            "voxel_remesh",
+            "noise_mask",
+        ):
+            raise ValueError("application_mode is not supported")
 
     def to_object(self):
         from engine.block_objects import PerlinNoiseTransformBlockObject
@@ -70,6 +79,8 @@ class PerlinNoiseTransformModel(EditorModel):
             manual_sampling=self.manual_sampling,
             preset=self.preset,
             preset_options=self.preset_options,
+            application_mode=self.application_mode,
+            penetration=self.penetration,
         )
         return PerlinNoiseTransformObject(
             name=self.name.strip() or "Perlin Noise Transform",
@@ -95,6 +106,8 @@ class PerlinNoiseTransformModel(EditorModel):
             manual_sampling=bool(data.get("manual_sampling", False)),
             preset=data.get("preset", "Manual"),
             preset_options=dict(data.get("preset_options", {})),
+            application_mode=data.get("application_mode", "voxel_remesh"),
+            penetration=int(data.get("penetration", 1)),
         )
 
     def to_json(self):
@@ -117,4 +130,6 @@ class PerlinNoiseTransformModel(EditorModel):
             "manual_sampling": self.manual_sampling,
             "preset": self.preset,
             "preset_options": dict(self.preset_options),
+            "application_mode": self.application_mode,
+            "penetration": self.penetration,
         }

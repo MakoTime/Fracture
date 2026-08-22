@@ -11,9 +11,11 @@ from components.table import TableManager, TableModel
 from components.tree import TreeManager, TreeModel
 from components.tree.roots import (
     colourmap_root,
+    island_root,
     mesh_root,
     root_objects,
     transform_root,
+    world_config,
 )
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from dialog.mesh_import.model import MeshImportModel
@@ -26,8 +28,10 @@ from engine.block_objects import GeneratedMeshBlockObject, MeshBlockObject
 from engine.block_objects import BlockObject
 from engine.block_objects import PerlinNoiseTransformBlockObject
 from engine.block_objects import ColourmapBlockObject
+from engine.block_objects import IslandBlockObject, WorldConfigBlockObject
 from objects.colourmap import ColourmapObject
 from objects.mesh_object import MeshObject
+from objects.island import Island
 
 
 class FakeScene:
@@ -82,7 +86,13 @@ def test_project_round_trip_saves_mesh_block_and_scene_state(tmp_path):
     mesh.set_visible(False)
 
     serializer = ProjectSerializer()
+    original_centre = world_config.centre
+    world_config.update_configuration(centre=(9.0, 8.0, 7.0))
     project_file = serializer.save(tmp_path, table_model, scene)
+
+    saved_data = json.loads(project_file.read_text(encoding="utf-8"))
+    assert saved_data["world_config"]["centre"] == [9.0, 8.0, 7.0]
+    world_config.update_configuration(centre=(1.0, 2.0, 3.0))
 
     assert project_file.name == "project.json"
     assert (tmp_path / "block_data" / "saved-guid.vtp").exists()
@@ -115,6 +125,8 @@ def test_project_round_trip_saves_mesh_block_and_scene_state(tmp_path):
     assert restored in scene.objects
     assert restored.visible is False
     assert restored.mesh_data.n_points == mesh.mesh_data.n_points
+    assert world_config.centre == (9.0, 8.0, 7.0)
+    world_config.update_configuration(centre=original_centre)
 
 
 def test_loaded_block_relationship_propagates_child_changes_and_invalidation():
@@ -138,11 +150,67 @@ def test_loaded_block_relationship_propagates_child_changes_and_invalidation():
     assert loaded_parent.child_block_objects == (loaded_child,)
     loaded_child.mark_changed()
     assert not loaded_parent.is_valid()
-
     loaded_parent.validate()
     loaded_child.validate()
     loaded_child.invalidate(force=True)
     assert not loaded_parent.is_valid()
+
+
+def test_project_round_trip_preserves_island_orbital_configuration(tmp_path):
+    table_model = TableModel(TableManager())
+    tree_manager = TreeManager()
+    tree_manager.root_nodes = root_objects.get_nodes()
+    scene = FakeScene()
+    importer = ObjectImporterModel(table_model, tree_manager, scene)
+    source = MeshObject(
+        name="Island source",
+        block_object=MeshBlockObject(mesh_data=pv.Sphere()),
+        guid="island-source-guid",
+    )
+    island_block = IslandBlockObject(
+        mesh_block=source.block_object,
+        world_config=world_config.block_object,
+        core_offset=5.0,
+        orbit_normal=(0.0, 2.0, 0.0),
+        orbit_angle=18.0,
+        curve_mesh=True,
+        mesh_data=pv.Sphere(radius=1.0),
+        guid="island-guid",
+    )
+    island = Island(
+        name="Orbiting island",
+        block_object=island_block,
+        guid="island-guid",
+    )
+    importer.register(source, parent=mesh_root, add_to_scene=False)
+    importer.register(island, parent=island_root, add_to_scene=True)
+
+    project_file = ProjectSerializer().save(tmp_path, table_model, scene)
+    saved = json.loads(project_file.read_text(encoding="utf-8"))
+    item = next(item for item in saved["objects"] if item["type"] == "island")
+    assert item["core_offset"] == 5.0
+    assert item["orbit_normal"] == [0.0, 1.0, 0.0]
+    assert item["orbit_angle"] == 18.0
+    assert item["curve_mesh"] is True
+
+    ProjectSerializer().load(
+        project_file,
+        importer,
+        TreeModel(root_objects.get_nodes()),
+        table_model,
+        scene,
+    )
+
+    restored = island_root.children[0].node_object
+    assert restored.block_object.core_offset == 5.0
+    assert restored.block_object.orbit_normal == (0.0, 1.0, 0.0)
+    assert restored.block_object.orbit_angle == 18.0
+    assert restored.block_object.curve_mesh is True
+    assert restored.block_object.mesh_block is not None
+    assert restored.block_object.world_config is world_config.block_object
+    restored_source = mesh_root.children[0].node_object
+    restored.destroy()
+    restored_source.destroy()
 
 
 def test_project_round_trip_preserves_perlin_editor_schema(tmp_path):
@@ -161,6 +229,8 @@ def test_project_round_trip_preserves_perlin_editor_schema(tmp_path):
         manual_sampling=True,
         preset="Sin wave",
         preset_options={"phase": 90.0, "amplitude": 0.75},
+        application_mode="noise_mask",
+        penetration=6,
     ).to_object()
     importer.register(transform, parent=transform_root, add_to_scene=False)
 
@@ -170,6 +240,8 @@ def test_project_round_trip_preserves_perlin_editor_schema(tmp_path):
     assert item["manual_sampling"] is True
     assert item["preset"] == "Sin wave"
     assert item["preset_options"]["phase"] == 90.0
+    assert item["application_mode"] == "noise_mask"
+    assert item["penetration"] == 6
 
     ProjectSerializer().load(
         project_file,
@@ -185,6 +257,8 @@ def test_project_round_trip_preserves_perlin_editor_schema(tmp_path):
     assert restored.block_object.manual_sampling is True
     assert restored.block_object.preset == "Sin wave"
     assert restored.block_object.preset_options["phase"] == 90.0
+    assert restored.block_object.application_mode == "noise_mask"
+    assert restored.block_object.penetration == 6
 
 
 def test_project_round_trip_saves_structured_elevation_block(qapp, tmp_path):

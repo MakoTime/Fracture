@@ -6,6 +6,17 @@ from dialog.mesh_filter import MeshFilterModel
 from dialog.mesh_generate import MeshGenerateModel
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from engine.block_tasks import GeneratedMeshTask, MeshFilterTask
+from engine.block_objects import (
+    ColourmapBlockObject,
+    IslandBlockObject,
+    MeshBlockObject,
+    WorldConfigBlockObject,
+)
+from engine.block_tasks import IslandTask
+from engine.block_tasks.island import _orbit_frame, build_island_mesh
+import numpy as np
+import pyvista as pv
+from objects.island import Island
 
 
 class DummyBlockObject(BlockObject):
@@ -64,6 +75,156 @@ class ProgressBlockTask:
     def process(self, prepared, progress_callback=None):
         progress_callback(0.4)
         self.block_object.validate()
+
+
+def test_island_uses_core_offset_and_orientation_to_derive_position():
+    world_config = WorldConfigBlockObject(centre=(10.0, 20.0, 30.0))
+    source = MeshBlockObject(mesh_data=pv.Sphere(radius=1.0))
+    island = IslandBlockObject(
+        mesh_block=source,
+        world_config=world_config,
+        core_offset=5.0,
+        orbit_normal=(0.0, 0.0, 1.0),
+        orbit_angle=90.0,
+        curve_mesh=True,
+    )
+
+    task = IslandTask(island)
+    result = task.process(task.prepare())
+    island.commit(result)
+
+    assert np.allclose(island.mesh_data.center, (10.0, 25.0, 30.0))
+    assert island.prepare()["curve_mesh"] is True
+    application_island = Island(block_object=island)
+    assert application_island.core_offset == 5.0
+    assert application_island.orbit_normal == (0.0, 0.0, 1.0)
+    assert application_island.orbit_angle == 90.0
+    assert application_island.curve_mesh is True
+    assert np.linalg.norm(np.asarray(island.mesh_data.center) - world_config.centre) == 5.0
+
+    world_config.update_configuration(centre=(0.0, 0.0, 0.0))
+    assert island.is_valid()
+
+
+def test_island_exposes_source_mesh_colourmap_for_scene_rendering():
+    colourmap = ColourmapBlockObject(name="Island colours")
+    source = MeshBlockObject(
+        mesh_data=pv.Plane(i_resolution=2, j_resolution=2),
+        colourmap=colourmap,
+    )
+    source.set_colourmap_field_sources("normal_z", "elevation")
+    source.set_colourmap_data_options(True, False)
+    island = IslandBlockObject(mesh_block=source)
+
+    assert island.colourmap is colourmap
+    assert island.colourmap_field_sources == ("normal_z", "elevation")
+    assert island.colourmap_field_inversions == (True, False)
+
+
+def test_island_radius_uses_orbit_normal_and_angle():
+    world_config = WorldConfigBlockObject()
+    source = MeshBlockObject(mesh_data=pv.Sphere(radius=1.0))
+
+    cases = (
+        (0.0, (10.0, 0.0, 0.0)),
+        (90.0, (0.0, 10.0, 0.0)),
+    )
+    for orbit_angle, expected in cases:
+        island = IslandBlockObject(
+            mesh_block=source,
+            world_config=world_config,
+            core_offset=10.0,
+            orbit_angle=orbit_angle,
+        )
+        result = IslandTask(island).process(island.prepare())
+        assert np.allclose(result.center, expected)
+
+
+def test_island_orbit_speed_advances_angle_without_changing_radius():
+    island = IslandBlockObject(orbit_speed=15.0, orbit_angle=20.0)
+
+    assert island.orbit_angle_at_time(0.0) == 20.0
+    assert island.orbit_angle_at_time(4.0) == 80.0
+
+
+def test_island_orbit_transform_moves_baked_mesh_without_rebuilding_it():
+    world_config = WorldConfigBlockObject(centre=(2.0, 3.0, 4.0))
+    source = MeshBlockObject(mesh_data=pv.Sphere(radius=1.0))
+    island = IslandBlockObject(
+        mesh_block=source,
+        world_config=world_config,
+        core_offset=5.0,
+        orbit_normal=(0.0, 0.0, 1.0),
+        orbit_angle=90.0,
+        orbit_speed=30.0,
+    )
+    island.commit(IslandTask(island).process(island.prepare()))
+    initial_points = np.asarray(island.mesh_data.points).copy()
+
+    transform = island.orbit_transform_at_time(3.0)
+    homogeneous_points = np.column_stack(
+        (np.asarray(island.mesh_data.points), np.ones(island.mesh_data.n_points))
+    )
+    transformed_points = (transform @ homogeneous_points.T).T[:, :3]
+    expected_radial, _, _ = _orbit_frame(island.orbit_normal, 180.0)
+
+    assert np.allclose(transformed_points.mean(axis=0), world_config.centre + 5.0 * expected_radial)
+    assert np.allclose(island.mesh_data.points, initial_points)
+
+
+def test_island_orbit_normal_is_normalized_and_controls_angle_motion():
+    island = IslandBlockObject(
+        orbit_normal=(0.0, 0.0, 2.0),
+        orbit_angle=10.0,
+        orbit_speed=15.0,
+    )
+
+    assert island.orbit_normal == (0.0, 0.0, 1.0)
+    assert island.orbit_angle_at_time(4.0) == 70.0
+
+
+def test_island_orbit_frame_is_orthonormal_at_both_poles():
+    for orbit_angle in (0.0, 180.0, 360.0):
+        radial, tangent, local_up = _orbit_frame(
+            np.array((0.0, 1.0, 0.0)), orbit_angle
+        )
+
+        assert np.isclose(np.linalg.norm(radial), 1.0)
+        assert np.isclose(np.linalg.norm(tangent), 1.0)
+        assert np.isclose(np.linalg.norm(local_up), 1.0)
+        assert np.isclose(np.dot(radial, tangent), 0.0)
+        assert np.isclose(np.dot(radial, local_up), 0.0)
+        assert np.isclose(np.dot(tangent, local_up), 0.0)
+
+
+def test_island_mesh_local_up_follows_radial_direction_at_poles():
+    source = pv.PolyData(
+        np.array(
+            [
+                (-1.0, 0.0, 0.0),
+                (1.0, 0.0, 0.0),
+                (0.0, -1.0, 0.0),
+                (0.0, 1.0, 0.0),
+                (0.0, 0.0, -1.0),
+                (0.0, 0.0, 1.0),
+            ]
+        )
+    )
+    for orbit_angle, expected in ((0.0, (0.0, 0.0, 5.0)), (180.0, (0.0, 0.0, -5.0))):
+        result = build_island_mesh(
+            {
+                "mesh_data": source,
+                "centre": (0.0, 0.0, 0.0),
+                "core_offset": 5.0,
+                "orbit_normal": (0.0, 1.0, 0.0),
+                "orbit_angle": orbit_angle,
+            }
+        )
+
+        assert np.allclose(result.center, expected)
+        local_up = np.asarray(result.points[5] - result.center)
+        local_up /= np.linalg.norm(local_up)
+        assert np.allclose(local_up, np.asarray(expected) / 5.0)
 
 
 def _drain_engine(model, qapp, cycles=5):
@@ -351,7 +512,6 @@ def test_generated_and_filter_tasks_complete_after_transform_invalidation(qapp):
             transform.block_object,
             filter_model.noise_minimum,
             filter_model.noise_maximum,
-            filter_model.noise_penetration,
             block_object=filtered.mesh_block_object,
         ),
     )

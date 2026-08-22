@@ -15,6 +15,8 @@ BIN_ICON = _icon("bin.svg")
 BLOOD_DROP_ICON = _icon("blood_drop.svg")
 COLOUR_PALETTE_ICON = _icon("colour_palette.svg")
 DASHBOARD_WARNING_ICON = _icon("dashboard_warning.svg")
+EARTH_ICON = _icon("earth.svg")
+FLOATING_ISLAND_ICON = _icon("floating_island.svg")
 FOLDER_ICON = _icon("folder.svg")
 FOLDER_COLLAPSED_ICON = _icon("folder_collapsed.svg")
 FOLDER_EXPANDED_ICON = _icon("folder_expanded.svg")
@@ -44,6 +46,8 @@ ICONS = {
 	"blood_drop": BLOOD_DROP_ICON,
 	"colour_palette": COLOUR_PALETTE_ICON,
 	"dashboard_warning": DASHBOARD_WARNING_ICON,
+	"earth": EARTH_ICON,
+	"floating_island": FLOATING_ISLAND_ICON,
 	"folder": FOLDER_ICON,
 	"folder_collapsed": FOLDER_COLLAPSED_ICON,
 	"folder_expanded": FOLDER_EXPANDED_ICON,

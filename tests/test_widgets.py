@@ -1,4 +1,4 @@
-from PySide6.QtCore import QDate, QTime
+from PySide6.QtCore import QDate, QDateTime, QTime
 
 from tools.widgets import (
     FastForwardWidget,
@@ -157,6 +157,26 @@ def test_world_state_media_controls_advance_selected_time(qapp):
     view.rate_combo.setCurrentIndex(4)
     view._advance_time(1000)
     assert view.date_spinbox.date() == QDate(2026, 10, 1)
+
+
+def test_world_state_datetime_edits_advance_timer_interfaces(qapp):
+    class TimerController:
+        def __init__(self):
+            self.deltas = []
+
+        def advance(self, delta_seconds):
+            self.deltas.append(delta_seconds)
+
+    timer_controller = TimerController()
+    view = WorldStateView(timer_controller=timer_controller)
+    view.date_spinbox.setDate(QDate(2026, 1, 1))
+    view.time_spinbox.setTime(QTime(0, 0, 0))
+    view._last_datetime = QDateTime(QDate(2026, 1, 1), QTime(0, 0, 0))
+
+    view.time_spinbox.setTime(QTime(0, 0, 5))
+    view.time_spinbox.editingFinished.emit()
+
+    assert timer_controller.deltas == [5.0]
 
 
 def test_world_state_time_advancement_interpolates(qapp):

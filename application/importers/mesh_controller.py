@@ -195,7 +195,6 @@ class MeshImportController:
             transform_block,
             filter_model.noise_minimum,
             filter_model.noise_maximum,
-            filter_model.noise_penetration,
             block_object=filtered_mesh.mesh_block_object,
         )
         if not hasattr(self.engine_runner, "enqueue_block_task"):
@@ -317,7 +316,6 @@ class MeshImportController:
                 transform_block,
                 parameters["noise_minimum"],
                 parameters["noise_maximum"],
-                parameters["noise_penetration"],
                 block_object=block,
             )
             self.engine_runner.enqueue_block_task(
