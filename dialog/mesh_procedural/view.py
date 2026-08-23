@@ -48,6 +48,7 @@ class MeshProceduralView(TabEditorView):
         parent=None,
         model=None,
         on_apply=None,
+        on_close=None,
         tree_search=None,
         deduper=None,
         transforms=(),
@@ -57,6 +58,7 @@ class MeshProceduralView(TabEditorView):
             model or MeshProceduralModel(),
             parent=parent,
             on_apply=on_apply,
+            on_close=on_close,
         )
         self.setWindowTitle("Generate Procedural Mesh")
         self.resize(900, 560)
@@ -123,6 +125,7 @@ class MeshProceduralView(TabEditorView):
             self.seed_line_edit = QLineEdit(str(self.model.seed))
         else:
             self.seed_line_edit = QLineEdit(str(self.model.seed))
+        self.seed_line_edit.textChanged.connect(self._seed_changed)
         
         self.upper_threshold = QSlider(Qt.Orientation.Horizontal)
         self.upper_threshold.setRange(0, 100)
@@ -256,10 +259,18 @@ class MeshProceduralView(TabEditorView):
         
     def _noise_object_changed(self, index):
         self.model.perlin_noise_transform = self.noise_object_combo.currentData()
+        self.seed_line_edit.setText(str(self.model.seed))
         self._update_preview()
         
     def _overwrite_noise_seed(self):
-        self.model.seed = int(self.seed_line_edit.text() or self.model.seed)
+        self._seed_changed(self.seed_line_edit.text())
+
+    def _seed_changed(self, value):
+        try:
+            self.model.seed = int(value)
+        except (TypeError, ValueError):
+            return
+        self._update_preview()
 
     def _update_grid_point_alpha_label(self, value):
         self.grid_point_alpha_value.setText(f"{value}%")

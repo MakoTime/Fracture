@@ -129,4 +129,13 @@ class ProceduralMeshObjectTask:
         transform = getattr(self.model, "perlin_noise_transform", None)
         if transform is None:
             return None
-        return getattr(transform, "block_object", transform)
+        if isinstance(transform, PerlinNoiseTransformBlockObject):
+            candidate = transform
+        elif hasattr(transform, "block_object"):
+            candidate = transform.block_object
+        else:
+            candidate = transform.to_object().block_object
+        current = self.block_object.perlin_noise_transform
+        if current is not None and current.guid == candidate.guid:
+            return current
+        return candidate

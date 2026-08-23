@@ -32,7 +32,7 @@ class GeneratedMeshBlockObject(MeshBlockObject):
             )
         self.perlin_noise_transform = perlin_noise_transform
         if self.perlin_noise_transform is not None:
-            self.add_change_child_block_object(self.perlin_noise_transform)
+            self.add_child_block_object(self.perlin_noise_transform)
             self.perlin_noise_transform.add_destruction_callback(
                 self._on_noise_transform_destroyed
             )
@@ -47,13 +47,13 @@ class GeneratedMeshBlockObject(MeshBlockObject):
         if self.perlin_noise_transform is transform:
             return transform
         if self.perlin_noise_transform is not None:
-            self.remove_change_child_block_object(self.perlin_noise_transform)
+            self.remove_child_block_object(self.perlin_noise_transform)
             self.perlin_noise_transform.remove_destruction_callback(
                 self._on_noise_transform_destroyed
             )
         self.perlin_noise_transform = transform
         if transform is not None:
-            self.add_change_child_block_object(transform)
+            self.add_child_block_object(transform)
             transform.add_destruction_callback(self._on_noise_transform_destroyed)
         if notify:
             self.mark_changed()
@@ -64,7 +64,7 @@ class GeneratedMeshBlockObject(MeshBlockObject):
             return
         self.perlin_noise_transform = None
         self.noise_enabled = False
-        self.remove_change_child_block_object(transform)
+        self.remove_child_block_object(transform)
         self.mark_changed()
 
     @staticmethod

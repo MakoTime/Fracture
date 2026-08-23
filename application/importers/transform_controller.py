@@ -92,6 +92,7 @@ class TransformController:
             name=transform.name,
             frequencies=block.frequencies,
             amplitudes=block.amplitudes,
+            max_amplitude=block.max_amplitude,
             seed=block.seed,
             guid=transform.guid,
             curve_mode=block.curve_mode,
@@ -122,6 +123,7 @@ class TransformController:
                 for field_name in (
                     "frequencies",
                     "amplitudes",
+                    "max_amplitude",
                     "seed",
                     "curve_mode",
                     "curve_points",

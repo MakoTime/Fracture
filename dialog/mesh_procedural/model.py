@@ -38,6 +38,7 @@ class MeshProceduralModel(EditorModel):
                 name=transform.name,
                 frequencies=transform_block.frequencies,
                 amplitudes=transform_block.amplitudes,
+                max_amplitude=transform_block.max_amplitude,
                 seed=transform_block.seed,
                 guid=transform_block.guid,
                 curve_mode=transform_block.curve_mode,

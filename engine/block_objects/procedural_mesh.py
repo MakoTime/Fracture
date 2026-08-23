@@ -29,7 +29,7 @@ class ProceduralMeshBlock(MeshBlockObject):
             )
         self.perlin_noise_transform = perlin_noise_transform
         if perlin_noise_transform is not None:
-            self.add_change_child_block_object(perlin_noise_transform)
+            self.add_child_block_object(perlin_noise_transform)
             perlin_noise_transform.add_destruction_callback(
                 self._on_noise_transform_destroyed
             )
@@ -44,13 +44,13 @@ class ProceduralMeshBlock(MeshBlockObject):
         if self.perlin_noise_transform is transform:
             return transform
         if self.perlin_noise_transform is not None:
-            self.remove_change_child_block_object(self.perlin_noise_transform)
+            self.remove_child_block_object(self.perlin_noise_transform)
             self.perlin_noise_transform.remove_destruction_callback(
                 self._on_noise_transform_destroyed
             )
         self.perlin_noise_transform = transform
         if transform is not None:
-            self.add_change_child_block_object(transform)
+            self.add_child_block_object(transform)
             transform.add_destruction_callback(self._on_noise_transform_destroyed)
         if notify:
             self.mark_changed()
@@ -59,7 +59,7 @@ class ProceduralMeshBlock(MeshBlockObject):
     def _on_noise_transform_destroyed(self, transform):
         if transform is not self.perlin_noise_transform:
             return
-        self.remove_change_child_block_object(transform)
+        self.remove_child_block_object(transform)
         self.perlin_noise_transform = None
         self.mark_changed()
 

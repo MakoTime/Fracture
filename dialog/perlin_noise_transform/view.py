@@ -40,7 +40,7 @@ class PerlinNoiseTransformView(PopupEditorView):
         frequency_minimum = (
             min(self.model.frequencies)
             if curve_range and len(self.model.frequencies) > 1
-            else min(self.model.frequencies)
+            else (1 if len(self.model.frequencies) == 1 else min(self.model.frequencies))
         )
         frequency_maximum = (
             max(self.model.frequencies)
@@ -66,7 +66,7 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.max_amplitude_field = QDoubleSpinBox()
         self.max_amplitude_field.setRange(0.0, 100000.0)
         self.max_amplitude_field.setDecimals(3)
-        self.max_amplitude_field.setValue(max(self.model.amplitudes, default=1.0))
+        self.max_amplitude_field.setValue(self.model.max_amplitude)
         self.amplitude_field = QLineEdit(", ".join(str(value) for value in self.model.amplitudes))
         self.amplitude_field.setVisible(False)
         self.seed_field = QSpinBox()
@@ -97,9 +97,9 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.graph = BezierCurveGraph(
             self.model.frequencies,
             self.model.amplitudes,
-            self.model.curve_points,
+            self._display_curve_points(),
             self.model.curve_mode,
-            curve_handles=self.model.curve_handles,
+            curve_handles=self._display_curve_handles(),
             frequency_min=self.frequency_min_field.value(),
             frequency_max=self.frequency_max_field.value(),
             amplitude_max=self.max_amplitude_field.value(),
@@ -123,9 +123,7 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.frequency_min_field.valueChanged.connect(self._frequency_range_changed)
         self.frequency_max_field.valueChanged.connect(self._frequency_range_changed)
         self.manual_sampling_field.toggled.connect(self._manual_sampling_changed)
-        self.max_amplitude_field.valueChanged.connect(self._graph_labels_changed)
-        self.max_amplitude_field.valueChanged.connect(self._update_preset_ranges)
-        self.max_amplitude_field.valueChanged.connect(self._apply_preset)
+        self.max_amplitude_field.valueChanged.connect(self._max_amplitude_changed)
 
         basic_form = QFormLayout()
         basic_form.addRow("Name", self.name_field)
@@ -171,6 +169,25 @@ class PerlinNoiseTransformView(PopupEditorView):
         widget = QWidget()
         widget.setLayout(self.options_layout)
         return widget
+
+    def _display_curve_points(self):
+        maximum = max(self.model.max_amplitude, 0.0001)
+        return tuple(
+            (x, max(0.0, min(1.0, y / maximum)))
+            for x, y in self.model.curve_points
+        )
+
+    def _display_curve_handles(self):
+        maximum = max(self.model.max_amplitude, 0.0001)
+        return tuple(
+            None
+            if handles is None
+            else tuple(
+                (x, max(0.0, min(1.0, y / maximum)))
+                for x, y in handles
+            )
+            for handles in self.model.curve_handles
+        )
 
     def _build_preset_options(self):
         while self.options_layout.rowCount():
@@ -316,6 +333,34 @@ class PerlinNoiseTransformView(PopupEditorView):
                 self.max_amplitude_field.value(),
             )
 
+    def _max_amplitude_changed(self, value):
+        if not hasattr(self, "graph"):
+            return
+        old_maximum = max(self.graph.amplitude_max, 0.0001)
+        new_maximum = max(float(value), 0.0001)
+        if self.preset_field.currentText() == "Manual":
+            scale = old_maximum / new_maximum
+            self.graph.amplitudes = [
+                max(0.0, min(1.0, amplitude * scale))
+                for amplitude in self.graph.amplitudes
+            ]
+            self.graph.curve_points = [
+                (point.x(), max(0.0, min(1.0, point.y() * scale)))
+                for point in self.graph.curve_points
+            ]
+            self.graph.curve_handles = [
+                None
+                if handles is None
+                else tuple(
+                    (point.x(), max(0.0, min(1.0, point.y() * scale)))
+                    for point in handles
+                )
+                for handles in self.graph.curve_handles
+            ]
+        self._graph_labels_changed()
+        self._update_preset_ranges()
+        self._apply_preset()
+
     def _update_graph_position(self, x, y):
         frequency = self.frequency_min_field.value() + x * (
             self.frequency_max_field.value() - self.frequency_min_field.value()
@@ -387,8 +432,20 @@ class PerlinNoiseTransformView(PopupEditorView):
                 seed=self.seed_field.value(),
                 guid=self.model.guid,
                 curve_mode="bezier" if mode == "continuous" else "discrete",
-                curve_points=self.graph.serialized_curve_points(),
-                curve_handles=self.graph.serialized_curve_handles(),
+                curve_points=tuple(
+                    (x, y * self.max_amplitude_field.value())
+                    for x, y in self.graph.serialized_curve_points()
+                ),
+                curve_handles=tuple(
+                    None
+                    if handles is None
+                    else tuple(
+                        (x, y * self.max_amplitude_field.value())
+                        for x, y in handles
+                    )
+                    for handles in self.graph.serialized_curve_handles()
+                ),
+                max_amplitude=self.max_amplitude_field.value(),
                 frequency_start=self.frequency_min_field.value(),
                 frequency_end=self.frequency_max_field.value(),
                 sample_count=sample_count,

@@ -1,5 +1,13 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from engine.task import EngineTask, EngineTaskModel, TaskStatus
 from tools.widgets import PlayPauseWidget
@@ -30,7 +38,11 @@ class EngineRunner(QWidget):
 
         self.task_table = QTableWidget(0, 3)
         self.task_table.setHorizontalHeaderLabels(["Task", "Status", "Progress"])
-        self.task_table.horizontalHeader().setStretchLastSection(True)
+        header = self.task_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.task_table.setWordWrap(False)
         self.task_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.task_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
 

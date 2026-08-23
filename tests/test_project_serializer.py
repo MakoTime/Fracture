@@ -69,6 +69,22 @@ class MockBlockObject(BlockObject):
         return directory
 
 
+def test_persisting_a_block_triggers_project_save_callback(tmp_path):
+    table_model = TableModel(TableManager())
+    tree_manager = TreeManager()
+    scene = FakeScene()
+    importer = ObjectImporterModel(table_model, tree_manager, scene)
+    importer.block_data_directory = tmp_path / "block_data"
+    saved_blocks = []
+    importer.set_project_save_callback(saved_blocks.append)
+    block = MockBlockObject()
+
+    output = importer.persist_block(block)
+
+    assert output == importer.block_data_directory
+    assert saved_blocks == [block]
+
+
 def test_project_round_trip_saves_mesh_block_and_scene_state(tmp_path):
     table_model = TableModel(TableManager())
     tree_manager = TreeManager()
@@ -455,7 +471,9 @@ def test_project_round_trip_restores_block_child_references(tmp_path):
     mesh_item = next(
         item for item in saved["objects"] if item["guid"] == mesh.guid
     )
-    assert mesh_item["child_references"] == []
+    assert mesh_item["child_references"] == [
+        {"guid": transform.guid, "dependent": False},
+    ]
     assert mesh_item["transform_reference"] == transform.guid
 
     ProjectSerializer().load(

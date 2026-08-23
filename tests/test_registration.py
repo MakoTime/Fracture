@@ -761,7 +761,7 @@ def test_mesh_filter_uses_source_transform_and_invalidates_source_mesh():
     assert not filtered.mesh_block_object.is_valid()
 
 
-def test_generated_mesh_transform_setter_does_not_reinvalidate_same_transform():
+def test_generated_mesh_transform_setter_keeps_same_transform_child():
     transform = _perlin_transform(size=4)
     block = GeneratedMeshBlockObject(
         name="Source",
@@ -772,7 +772,7 @@ def test_generated_mesh_transform_setter_does_not_reinvalidate_same_transform():
 
     assert block.set_perlin_noise_transform(transform.block_object) is transform.block_object
     assert block.is_valid()
-    assert transform.block_object not in block.child_block_objects
+    assert transform.block_object in block.child_block_objects
 
 
 def test_generated_mesh_generation_settings_can_reopen():

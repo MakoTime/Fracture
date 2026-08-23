@@ -165,6 +165,7 @@ class MeshImportController:
         if self.generate_procedural_mesh_window is None:
             self.generate_procedural_mesh_window = create_mesh_procedural_dialog(
                 on_apply=self._register_procedural_mesh,
+                on_close=self._procedural_mesh_dialog_closed,
                 parent=self.parent,
                 tree_search=TreeSearch(root_objects.get_nodes()),
                 deduper=self._deduper(),
@@ -202,6 +203,10 @@ class MeshImportController:
             else:
                 self.generate_procedural_mesh_window.show()
         return self.generate_procedural_mesh_window
+
+    def _procedural_mesh_dialog_closed(self, _model, _reason):
+        """Discard the editor so the next generation uses current project state."""
+        self.generate_procedural_mesh_window = None
 
     def _register_procedural_mesh(self, mesh_object):
         """Persist and register a procedural mesh after generation."""
@@ -333,7 +338,7 @@ class MeshImportController:
         return self._sync_mesh_children(mesh_object)
 
     def _sync_mesh_children(self, mesh_object):
-        block_children = mesh_object.mesh_block_object.child_block_objects
+        block_children = mesh_object.mesh_block_object.relationship_child_block_objects
         transforms = TreeSearch(root_objects.get_nodes()).find(
             lambda node: node.block_object in block_children
         )

@@ -32,6 +32,7 @@ class ProjectController:
         self.controllers = []
         self.project_serializer = ProjectSerializer()
         self.project_file = None
+        self._project_loading = False
 
     def setup(self, menu_bar=None):
         """Connect the loaded widgets and initialize project features."""
@@ -61,6 +62,9 @@ class ProjectController:
             tree_manager=self.tree_manager,
             scene_viewer=self.window.scene_viewer,
             tree_model=self.tree_model,
+        )
+        self.object_importer.set_project_save_callback(
+            self._save_project_after_block
         )
         self.window.worldStateView.timer_controller = (
             self.object_importer.timer_controller
@@ -131,16 +135,16 @@ class ProjectController:
         return next_name
 
     def _configure_scene_splitters(self):
-        """Set compact defaults while keeping all Scene panels resizable."""
-        dock_splitter = self.window.sceneDockSplitter
-        dock_splitter.setStretchFactor(0, 1)
-        dock_splitter.setStretchFactor(1, 5)
+        """Set compact defaults while keeping all panels resizable."""
+        navigation_splitter = self.window.treeDockSplitter
+        navigation_splitter.setStretchFactor(0, 2)
+        navigation_splitter.setStretchFactor(1, 1)
 
         main_splitter = self.window.sceneMainSplitter
         main_splitter.setStretchFactor(0, 5)
         main_splitter.setStretchFactor(1, 1)
         QTimer.singleShot(0, lambda: self._set_scene_splitter_sizes(
-            dock_splitter, (1, 5)
+            navigation_splitter, (2, 1)
         ))
         QTimer.singleShot(0, lambda: self._set_scene_splitter_sizes(
             main_splitter, (5, 1)
@@ -176,6 +180,13 @@ class ProjectController:
             self.table_model,
             self.window.scene_viewer,
         )
+
+    def _save_project_after_block(self, block_object):
+        """Save project metadata after an application-level block save."""
+        del block_object
+        if self._project_loading or self.project_file is None:
+            return None
+        return self.save_project()
 
     def save_project_as(self):
         """Save the current project to a newly selected metadata file."""
@@ -245,14 +256,18 @@ class ProjectController:
 
     def load_project(self, project_file):
         """Load a project and make its file the active save target."""
-        self._set_block_data_directory(project_file)
-        loaded = self.project_serializer.load(
-            project_file,
-            self.object_importer,
-            self.tree_model,
-            self.table_model,
-            self.window.scene_viewer,
-        )
+        self._project_loading = True
+        try:
+            self._set_block_data_directory(project_file)
+            loaded = self.project_serializer.load(
+                project_file,
+                self.object_importer,
+                self.tree_model,
+                self.table_model,
+                self.window.scene_viewer,
+            )
+        finally:
+            self._project_loading = False
         for controller in self.controllers:
             if hasattr(controller, "bind_loaded_tasks"):
                 controller.bind_loaded_tasks(loaded)

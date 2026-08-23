@@ -78,6 +78,11 @@ class FrequencyAmplitudeGraph(QWidget):
 
     @staticmethod
     def _normalize_handles(handles):
+        def normalize_point(point):
+            if isinstance(point, QPointF):
+                return QPointF(point)
+            return QPointF(float(point[0]), float(point[1]))
+
         normalized = []
         for handle in handles:
             if handle is None:
@@ -87,8 +92,8 @@ class FrequencyAmplitudeGraph(QWidget):
                 continue
             normalized.append(
                 (
-                    QPointF(float(handle[0][0]), float(handle[0][1])),
-                    QPointF(float(handle[1][0]), float(handle[1][1])),
+                    normalize_point(handle[0]),
+                    normalize_point(handle[1]),
                 )
             )
         return normalized
@@ -212,61 +217,57 @@ class FrequencyAmplitudeGraph(QWidget):
     def paintEvent(self, event):
         del event
         self.curve_points = self._normalized_curve_points(self.curve_points)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(self.rect(), self.palette().base())
-        rect = self._plot_rect()
-        painter.setPen(QPen(self.palette().mid(), 1))
-        painter.drawRect(rect)
-        painter.setPen(QPen(self.palette().mid(), 1))
-        for value in self._axis_ticks(self.frequency_min, self.frequency_max):
-            progress = (value - self.frequency_min) / max(0.0001, self.frequency_max - self.frequency_min)
-            x = rect.left() + progress * rect.width()
-            painter.drawLine(QPointF(x, rect.bottom()), QPointF(x, rect.bottom() + 4))
-            painter.drawText(QRectF(x - 30, rect.bottom() + 5, 60, 18), Qt.AlignmentFlag.AlignHCenter, self._format_tick(value))
-        for value in self._axis_ticks(0.0, self.amplitude_max):
-            progress = value / max(0.0001, self.amplitude_max)
-            y = rect.bottom() - progress * rect.height()
-            painter.drawLine(QPointF(rect.left() - 4, y), QPointF(rect.left(), y))
-            painter.drawText(QRectF(0, y - 9, rect.left() - 7, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._format_tick(value))
-
-        if self.curve_mode == "bezier" and self.curve_points:
-            path = QPainterPath(self._to_pixel(self.curve_points[0].x(), self.curve_points[0].y()))
-            for index in range(1, self.sample_count):
-                point = self._bezier_point(index / (self.sample_count - 1))
-                path.lineTo(self._to_pixel(point.x(), point.y()))
-            painter.setPen(QPen(self.palette().highlight(), 2))
-            painter.drawPath(path)
-            painter.setBrush(self.palette().highlight())
-            for point in self.curve_points:
-                painter.drawEllipse(self._to_pixel(point.x(), point.y()), 5, 5)
+        with QPainter(self) as painter:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.fillRect(self.rect(), self.palette().base())
+            rect = self._plot_rect()
             painter.setPen(QPen(self.palette().mid(), 1))
-            for index, handles in enumerate(self._effective_handles()):
-                anchor = self.curve_points[index]
-                painter.drawLine(self._to_pixel(anchor.x(), anchor.y()), self._to_pixel(handles[0].x(), handles[0].y()))
-                painter.drawLine(self._to_pixel(anchor.x(), anchor.y()), self._to_pixel(handles[1].x(), handles[1].y()))
-            painter.end()
-            return
+            painter.drawRect(rect)
+            painter.setPen(QPen(self.palette().mid(), 1))
+            for value in self._axis_ticks(self.frequency_min, self.frequency_max):
+                progress = (value - self.frequency_min) / max(0.0001, self.frequency_max - self.frequency_min)
+                x = rect.left() + progress * rect.width()
+                painter.drawLine(QPointF(x, rect.bottom()), QPointF(x, rect.bottom() + 4))
+                painter.drawText(QRectF(x - 30, rect.bottom() + 5, 60, 18), Qt.AlignmentFlag.AlignHCenter, self._format_tick(value))
+            for value in self._axis_ticks(0.0, self.amplitude_max):
+                progress = value / max(0.0001, self.amplitude_max)
+                y = rect.bottom() - progress * rect.height()
+                painter.drawLine(QPointF(rect.left() - 4, y), QPointF(rect.left(), y))
+                painter.drawText(QRectF(0, y - 9, rect.left() - 7, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._format_tick(value))
 
-        if self.curve_mode == "line" and self.curve_points:
-            path = QPainterPath(self._to_pixel(self.curve_points[0].x(), self.curve_points[0].y()))
-            for point in self.curve_points[1:]:
-                path.lineTo(self._to_pixel(point.x(), point.y()))
-            painter.setPen(QPen(self.palette().highlight(), 2))
-            painter.drawPath(path)
-            painter.end()
-            return
+            if self.curve_mode == "bezier" and self.curve_points:
+                path = QPainterPath(self._to_pixel(self.curve_points[0].x(), self.curve_points[0].y()))
+                for index in range(1, self.sample_count):
+                    point = self._bezier_point(index / (self.sample_count - 1))
+                    path.lineTo(self._to_pixel(point.x(), point.y()))
+                painter.setPen(QPen(self.palette().highlight(), 2))
+                painter.drawPath(path)
+                painter.setBrush(self.palette().highlight())
+                for point in self.curve_points:
+                    painter.drawEllipse(self._to_pixel(point.x(), point.y()), 5, 5)
+                painter.setPen(QPen(self.palette().mid(), 1))
+                for index, handles in enumerate(self._effective_handles()):
+                    anchor = self.curve_points[index]
+                    painter.drawLine(self._to_pixel(anchor.x(), anchor.y()), self._to_pixel(handles[0].x(), handles[0].y()))
+                    painter.drawLine(self._to_pixel(anchor.x(), anchor.y()), self._to_pixel(handles[1].x(), handles[1].y()))
+                return
 
-        if not self.amplitudes:
-            painter.end()
-            return
-        bar_width = rect.width() / len(self.amplitudes)
-        painter.setBrush(self.palette().highlight())
-        painter.setPen(Qt.PenStyle.NoPen)
-        for index, value in enumerate(self.amplitudes):
-            height = value * rect.height()
-            painter.drawRect(QRectF(rect.left() + index * bar_width + 1, rect.bottom() - height, max(1, bar_width - 2), height))
-        painter.end()
+            if self.curve_mode == "line" and self.curve_points:
+                path = QPainterPath(self._to_pixel(self.curve_points[0].x(), self.curve_points[0].y()))
+                for point in self.curve_points[1:]:
+                    path.lineTo(self._to_pixel(point.x(), point.y()))
+                painter.setPen(QPen(self.palette().highlight(), 2))
+                painter.drawPath(path)
+                return
+
+            if not self.amplitudes:
+                return
+            bar_width = rect.width() / len(self.amplitudes)
+            painter.setBrush(self.palette().highlight())
+            painter.setPen(Qt.PenStyle.NoPen)
+            for index, value in enumerate(self.amplitudes):
+                height = value * rect.height()
+                painter.drawRect(QRectF(rect.left() + index * bar_width + 1, rect.bottom() - height, max(1, bar_width - 2), height))
 
     def mousePressEvent(self, event):
         self._emit_mouse_position(event.position())
@@ -366,7 +367,7 @@ class FrequencyAmplitudeGraph(QWidget):
 
     def _effective_handles(self):
         points = self._normalized_curve_points(self.curve_points)
-        handles = list(self.curve_handles)
+        handles = self._normalize_handles(self.curve_handles)
         while len(handles) < len(points):
             handles.append(None)
         effective = []

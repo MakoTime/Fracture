@@ -4,7 +4,7 @@ from dialog.mesh_procedural.model import MeshProceduralModel
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from engine import EngineTaskModel, TaskStatus
 from engine.block_objects import ProceduralMeshBlock
-from engine.block_tasks import ProceduralMeshTask
+from engine.block_tasks import ProceduralMeshObjectTask, ProceduralMeshTask
 from objects.procedural_mesh import ProceduralMeshObject
 
 
@@ -34,6 +34,20 @@ def test_procedural_task_builds_deterministic_thresholded_scalar_grid():
     )
     assert first_result["grid_data"].size == 5 * 5 * 5
     assert first_result["mesh_data"].n_points > 0
+
+
+def test_procedural_seed_changes_scalar_grid():
+    first_model = _model(seed=17)
+    second_model = _model(seed=18)
+
+    first = ProceduralMeshTask(first_model).process(
+        ProceduralMeshTask(first_model).prepare()
+    )
+    second = ProceduralMeshTask(second_model).process(
+        ProceduralMeshTask(second_model).prepare()
+    )
+
+    assert not np.array_equal(first["grid_data"], second["grid_data"])
 
 
 def test_procedural_task_leaves_empty_space_without_transform():
@@ -71,6 +85,17 @@ def test_procedural_model_creates_procedural_mesh_object():
     assert isinstance(mesh.mesh_block_object, ProceduralMeshBlock)
     assert mesh.grid_shape == (5, 5, 5)
     assert mesh.mesh_data.n_points > 0
+
+
+def test_procedural_object_task_accepts_reconstructed_transform_model():
+    mesh = _model().generate()
+    model = MeshProceduralModel.from_procedural_mesh(mesh)
+    task = ProceduralMeshObjectTask(model, mesh.mesh_block_object)
+
+    task.execute(task.prepare())
+
+    assert task.block_object.perlin_noise_transform is not None
+    assert task.block_object.mesh_data.n_points > 0
 
 
 def test_procedural_task_runner_commits_result(qapp):

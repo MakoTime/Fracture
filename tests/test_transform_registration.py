@@ -123,7 +123,7 @@ def test_perlin_dialog_resizes_bars_when_frequency_count_changes(qapp):
     dialog.frequency_count_field.setValue(4)
 
     assert len(dialog.graph.amplitudes) == 4
-    assert dialog.frequency_min_field.value() == 4
+    assert dialog.frequency_min_field.value() == 1
     assert dialog.frequency_max_field.value() == 8
     assert dialog.amplitude_field.text() == "1, 0, 0, 0"
     dialog.close()
@@ -144,6 +144,23 @@ def test_perlin_dialog_uses_continuous_mode_and_max_amplitude(qapp):
     assert dialog.graph.frequency_min == 3
     assert dialog.graph.frequency_max == 20
     assert dialog.graph.amplitude_max == pytest.approx(12.5)
+    assert dialog.graph.curve_points[1].y() == pytest.approx(1.0 / 12.5)
+    assert dialog.apply_model().amplitudes[dialog.frequency_count_field.value() // 2] == pytest.approx(1.0)
+    dialog.close()
+
+
+def test_perlin_dialog_clamps_out_of_range_curve_coordinates(qapp):
+    model = PerlinNoiseTransformModel(
+        curve_mode="bezier",
+        curve_points=((0.0, 0.0), (0.5, 4.0), (1.0, 0.0)),
+        curve_handles=(None, ((0.3, 4.0), (0.7, -2.0)), None),
+        max_amplitude=1.0,
+    )
+    dialog = create_perlin_noise_transform_dialog(model, parent=None)
+
+    assert dialog.graph.curve_points[1].y() == pytest.approx(1.0)
+    assert dialog.graph.curve_handles[1][0].y() == pytest.approx(1.0)
+    assert dialog.graph.curve_handles[1][1].y() == pytest.approx(0.0)
     dialog.close()
 
 

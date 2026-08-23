@@ -46,13 +46,7 @@
       <property name="windowTitle">
        <string>Scene Objects</string>
       </property>
-      <widget class="QSplitter" name="sceneDockSplitter">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <widget class="EngineRunner" name="engineRunner"/>
-       <widget class="TableView" name="tableView"/>
-      </widget>
+      <widget class="TableView" name="tableView"/>
       </widget>
       </widget>
          </item>
@@ -75,9 +69,10 @@
    <attribute name="dockWidgetArea">
     <number>1</number>
    </attribute>
-    <widget class="QWidget" name="treeDockContents">
-     <layout class="QVBoxLayout" name="treeLayout">
-      <item>
+    <widget class="QSplitter" name="treeDockSplitter">
+     <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+     </property>
       <widget class="TreeView" name="treeWidget">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -86,8 +81,7 @@
         </sizepolicy>
        </property>
       </widget>
-      </item>
-     </layout>
+        <widget class="EngineRunner" name="engineRunner"/>
     </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">

@@ -99,6 +99,7 @@ class ProjectSerializer:
                 name=transform.name,
                 frequencies=transform.block_object.frequencies,
                 amplitudes=transform.block_object.amplitudes,
+                max_amplitude=transform.block_object.max_amplitude,
                 seed=transform.block_object.seed,
                 guid=transform.guid,
                 curve_mode=transform.block_object.curve_mode,

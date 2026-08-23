@@ -34,6 +34,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
 
     frequencies: tuple[int, ...] = (4,)
     amplitudes: tuple[float, ...] = (1.0,)
+    max_amplitude: float | None = None
     seed: int = 0
     curve_mode: str = "discrete"
     curve_points: tuple[tuple[float, float], ...] = ()
@@ -53,6 +54,9 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
         super().__post_init__()
         self.frequencies = tuple(int(value) for value in self.frequencies)
         self.amplitudes = tuple(float(value) for value in self.amplitudes)
+        if self.max_amplitude is None:
+            self.max_amplitude = max(self.amplitudes, default=1.0)
+        self.max_amplitude = float(self.max_amplitude)
         self.curve_points = tuple(
             (float(point[0]), float(point[1])) for point in self.curve_points
         )
@@ -75,6 +79,8 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             raise ValueError("frequencies must contain positive integers")
         if any(value < 0.0 for value in self.amplitudes):
             raise ValueError("amplitudes must be non-negative")
+        if self.max_amplitude < 0.0:
+            raise ValueError("max_amplitude must be non-negative")
 
     def prepare(self):
         if not self.frequencies or len(self.frequencies) != len(self.amplitudes):
@@ -120,6 +126,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
         allowed = {
             "frequencies",
             "amplitudes",
+            "max_amplitude",
             "seed",
             "curve_mode",
             "curve_points",
@@ -140,6 +147,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
             setattr(self, name, value)
         self.frequencies = tuple(int(value) for value in self.frequencies)
         self.amplitudes = tuple(float(value) for value in self.amplitudes)
+        self.max_amplitude = float(self.max_amplitude)
         self.penetration = max(1, int(self.penetration))
         self.prepare()
         self.mark_changed()
@@ -179,6 +187,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
                     "comments": self.comments,
                     "frequencies": list(self.frequencies),
                     "amplitudes": list(self.amplitudes),
+                            "max_amplitude": self.max_amplitude,
                     "seed": self.seed,
                     "curve_mode": self.curve_mode,
                     "curve_points": [list(point) for point in self.curve_points],

@@ -13,6 +13,7 @@ class PerlinNoiseTransformModel(EditorModel):
     name: str = "Perlin Noise Transform"
     frequencies: tuple[int, ...] = (4,)
     amplitudes: tuple[float, ...] = (1.0,)
+    max_amplitude: float | None = None
     guid: str = field(default_factory=lambda: str(uuid4()))
     seed: int | None = None
     curve_mode: str = "bezier"
@@ -32,6 +33,9 @@ class PerlinNoiseTransformModel(EditorModel):
             self.seed = UUID(self.guid).int & 0x7FFFFFFF
         self.frequencies = tuple(int(value) for value in self.frequencies)
         self.amplitudes = tuple(float(value) for value in self.amplitudes)
+        if self.max_amplitude is None:
+            self.max_amplitude = max(self.amplitudes, default=1.0)
+        self.max_amplitude = float(self.max_amplitude)
         self.curve_points = tuple(
             (float(point[0]), float(point[1])) for point in self.curve_points
         )
@@ -53,6 +57,8 @@ class PerlinNoiseTransformModel(EditorModel):
             raise ValueError("frequencies must be positive integers")
         if any(value < 0.0 for value in self.amplitudes):
             raise ValueError("amplitudes must be non-negative")
+        if self.max_amplitude < 0.0:
+            raise ValueError("max_amplitude must be non-negative")
         if self.curve_mode not in ("discrete", "bezier"):
             raise ValueError("curve_mode must be discrete or bezier")
         if self.frequency_start >= self.frequency_end:
@@ -70,6 +76,7 @@ class PerlinNoiseTransformModel(EditorModel):
         block = PerlinNoiseTransformBlockObject(
             frequencies=self.frequencies,
             amplitudes=self.amplitudes,
+            max_amplitude=self.max_amplitude,
             seed=self.seed,
             guid=self.guid,
             curve_mode=self.curve_mode,
@@ -97,6 +104,7 @@ class PerlinNoiseTransformModel(EditorModel):
             name=data.get("name", cls.name),
             frequencies=tuple(data.get("frequencies", (4,))),
             amplitudes=tuple(data.get("amplitudes", (1.0,))),
+            max_amplitude=data.get("max_amplitude"),
             seed=int(data.get("seed", 0)),
             guid=data.get("guid", str(uuid4())),
             curve_mode=data.get("curve_mode", "bezier"),
@@ -118,6 +126,7 @@ class PerlinNoiseTransformModel(EditorModel):
             "name": self.name,
             "frequencies": list(self.frequencies),
             "amplitudes": list(self.amplitudes),
+            "max_amplitude": self.max_amplitude,
             "seed": self.seed,
             "guid": self.guid,
             "curve_mode": self.curve_mode,

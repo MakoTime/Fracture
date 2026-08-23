@@ -14,6 +14,8 @@ class ObjectImporterModel:
         self.scene_viewer = scene_viewer
         self.tree_model = tree_model
         self.block_data_directory = None
+        self.project_save_callback = None
+        self._project_save_in_progress = False
         from components.scene import ShapeController
         from components.timer import TimerController
 
@@ -29,7 +31,19 @@ class ObjectImporterModel:
         """Persist a processed block when the active project has storage."""
         if self.block_data_directory is None:
             return None
-        return block_object.serialise_to_directory(self.block_data_directory)
+        block_path = block_object.serialise_to_directory(self.block_data_directory)
+        callback = self.project_save_callback
+        if callback is not None and not self._project_save_in_progress:
+            self._project_save_in_progress = True
+            try:
+                callback(block_object)
+            finally:
+                self._project_save_in_progress = False
+        return block_path
+
+    def set_project_save_callback(self, callback):
+        """Set the callback used to save project metadata after a block save."""
+        self.project_save_callback = callback
 
     def register(
         self,
