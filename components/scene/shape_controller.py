@@ -30,6 +30,9 @@ class ShapeInterface:
     def clear(self):
         return self.controller.clear(self.object_base)
 
+    def set_visible(self, shape, visible):
+        return self.controller.set_visible(self.object_base, shape, visible)
+
     def __str__(self):
         return f"Shapes ({len(self.shapes)})"
 
@@ -48,6 +51,17 @@ class ShapeController:
         object_base.shape_interface = ShapeInterface(self, object_base)
         if getattr(object_base, "row_data", None) is not None:
             object_base.row_data.other = object_base.shape_interface
+        register_shapes = getattr(object_base, "register_shapes", None)
+        if (
+            callable(register_shapes)
+            and not getattr(object_base, "_registering_shapes", False)
+            and not self._shapes[object_base]
+        ):
+            object_base._registering_shapes = True
+            try:
+                register_shapes(object_base.shape_interface)
+            finally:
+                del object_base._registering_shapes
         return self
 
     def add(self, object_base, shape):
@@ -55,7 +69,9 @@ class ShapeController:
             raise TypeError("shape must be a Shape")
         self.attach(object_base)
         self._shapes[object_base].append(shape)
-        if self.scene_viewer is not None:
+        if self.scene_viewer is not None and hasattr(
+            self.scene_viewer, "add_shape"
+        ):
             self.scene_viewer.add_shape(object_base, shape)
         self._refresh_table(object_base)
         return shape
@@ -74,8 +90,22 @@ class ShapeController:
         if shape not in shapes:
             return False
         shapes.remove(shape)
-        if self.scene_viewer is not None:
+        if self.scene_viewer is not None and hasattr(
+            self.scene_viewer, "remove_shape"
+        ):
             self.scene_viewer.remove_shape(object_base, shape)
+        self._refresh_table(object_base)
+        return True
+
+    def set_visible(self, object_base, shape, visible):
+        shapes = self._shapes.get(object_base, ())
+        if shape not in shapes:
+            return False
+        shape.visible = bool(visible)
+        if self.scene_viewer is not None and hasattr(
+            self.scene_viewer, "set_shape_visibility"
+        ):
+            self.scene_viewer.set_shape_visibility(object_base, shape, visible)
         self._refresh_table(object_base)
         return True
 

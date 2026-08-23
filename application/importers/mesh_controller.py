@@ -59,9 +59,18 @@ class MeshImportController:
         """Adapt the tree view callback to the mesh menu API."""
         return self.create_context_menu(index.internalPointer(), parent)
 
+    def _deduper(self, exclude=None):
+        model = self.tree_view.model() if hasattr(self.tree_view, "model") else None
+        if isinstance(model, TreeModel):
+            return lambda name: model.next_name(name, exclude=exclude)
+        return lambda name: name
+
     def import_mesh(self) -> Optional[EngineTask]:
         """Queue an accepted 3D object mesh import."""
-        dialog = create_mesh_import_dialog(parent=self.parent)
+        dialog = create_mesh_import_dialog(
+            parent=self.parent,
+            deduper=self._deduper(),
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
@@ -72,7 +81,10 @@ class MeshImportController:
 
     def import_elevation(self) -> Optional[EngineTask]:
         """Queue an accepted elevation image import."""
-        dialog = create_elevation_import_dialog(parent=self.parent)
+        dialog = create_elevation_import_dialog(
+            parent=self.parent,
+            deduper=self._deduper(),
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
@@ -87,6 +99,7 @@ class MeshImportController:
             self.generate_mesh_window = GenerateMeshWindow(
                 on_apply=self._register_generated_mesh,
                 tree_search=TreeSearch(root_objects.get_nodes()),
+                deduper=self._deduper(),
             )
             workspace_tabs = (
                 self.parent.findChild(QTabWidget, "workspaceTabs")
@@ -119,6 +132,7 @@ class MeshImportController:
             model=MeshGenerateModel.from_generated_mesh(mesh_object),
             on_apply=lambda edited: self._replace_generated_mesh(mesh_object, edited),
             tree_search=TreeSearch(root_objects.get_nodes()),
+            deduper=self._deduper(exclude=mesh_object),
         )
         workspace_tabs = (
             self.parent.findChild(QTabWidget, "workspaceTabs")
@@ -146,6 +160,7 @@ class MeshImportController:
                 model.generate(), mesh_object, model
             ),
             transforms=tuple(transforms),
+            deduper=self._deduper(),
         )
         workspace_tabs = (
             self.parent.findChild(QTabWidget, "workspaceTabs")
@@ -340,6 +355,7 @@ class MeshImportController:
             mesh_object,
             colourmaps=tuple(colourmaps),
             parent=self.parent,
+            deduper=self._deduper(exclude=mesh_object),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
@@ -372,11 +388,27 @@ class MeshImportController:
         )
         def apply_colourmap(model):
             model.apply(mesh_object)
-            self._sync_mesh_children(mesh_object)
-            self.object_importer.persist_block(mesh_object.mesh_block_object)
             scene = getattr(self.object_importer, "scene_viewer", None)
-            if scene is not None and hasattr(scene, "refresh_object_colourmap"):
-                scene.refresh_object_colourmap(mesh_object)
+            affected_meshes = [mesh_object]
+            if model.scope == "global" and scene is not None:
+                affected_meshes = [
+                    scene_object
+                    for scene_object in scene.scene_model.objects
+                    if isinstance(scene_object, MeshObject)
+                ]
+                if mesh_object not in affected_meshes:
+                    affected_meshes.append(mesh_object)
+                for affected_mesh in affected_meshes:
+                    if affected_mesh is not mesh_object:
+                        model.apply(affected_mesh)
+            for affected_mesh in affected_meshes:
+                self._sync_mesh_children(affected_mesh)
+                self.object_importer.persist_block(affected_mesh.mesh_block_object)
+                if (
+                    scene is not None
+                    and hasattr(scene, "refresh_object_colourmap")
+                ):
+                    scene.refresh_object_colourmap(affected_mesh)
             tree_model = self.tree_view.model()
             if isinstance(tree_model, TreeModel):
                 tree_model.refresh()

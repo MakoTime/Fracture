@@ -48,6 +48,9 @@ class MeshColourmapView(TabEditorView):
             self.field2.addItem(label, source_id)
         self.invert_field1 = QCheckBox("Invert Field 1")
         self.invert_field2 = QCheckBox("Invert Field 2")
+        self.scope = QComboBox()
+        self.scope.addItem("Local", "local")
+        self.scope.addItem("Global", "global")
         self.colourmap.currentIndexChanged.connect(self._refresh_preview)
         self.field1.currentIndexChanged.connect(self._refresh_preview)
         self.field2.currentIndexChanged.connect(self._refresh_preview)
@@ -65,6 +68,7 @@ class MeshColourmapView(TabEditorView):
         field2_row = self._field_row(self.field2, self.invert_field2)
         form = QFormLayout()
         form.addRow("Colourmap", self.colourmap)
+        form.addRow("Elevation scope", self.scope)
         form.addRow("Field 1", field1_row)
         form.addRow("Field 2", field2_row)
         settings_group = QGroupBox("Colourmap")
@@ -143,6 +147,7 @@ class MeshColourmapView(TabEditorView):
         self._set_combo_data(self.colourmap, self.model.colourmap)
         self._set_combo_data(self.field1, self.model.field1_source)
         self._set_combo_data(self.field2, self.model.field2_source)
+        self._set_combo_data(self.scope, self.model.scope)
         self.invert_field1.setChecked(self.model.invert_field1)
         self.invert_field2.setChecked(self.model.invert_field2)
 
@@ -152,6 +157,7 @@ class MeshColourmapView(TabEditorView):
         self.model.field2_source = self.field2.currentData()
         self.model.invert_field1 = self.invert_field1.isChecked()
         self.model.invert_field2 = self.invert_field2.isChecked()
+        self.model.scope = self.scope.currentData()
         return self.model
 
     def apply_model(self):

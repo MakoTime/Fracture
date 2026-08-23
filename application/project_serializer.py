@@ -69,6 +69,7 @@ class ProjectSerializer:
                 ),
                 "colourmap_field_sources": list(block.colourmap_field_sources),
                 "colourmap_field_inversions": list(block.colourmap_field_inversions),
+                "colourmap_scope": block.colourmap_scope,
                 "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
             }
             if hasattr(block, "filter_parameters"):
@@ -286,6 +287,7 @@ class ProjectSerializer:
                         guid=item["guid"],
                         auto_register_root=False,
                     )
+                    island.show_in_scene = bool(item.get("in_scene", False))
                     object_importer.register(
                         island,
                         parent=parent,
@@ -349,6 +351,7 @@ class ProjectSerializer:
                 )
                 if len(inversions) == 2:
                     block.set_colourmap_data_options(*inversions)
+                block.set_colourmap_scope(item.get("colourmap_scope", "local"))
                 object_importer.register(
                     mesh_object,
                     parent=parent,
@@ -471,16 +474,22 @@ class ProjectSerializer:
     @staticmethod
     def _restore_mesh_child_nodes(loaded):
         objects = tuple(loaded.values())
-        for mesh_object in objects:
-            if not isinstance(mesh_object, MeshObject):
+        by_block = {
+            getattr(object_base, "block_object", None): object_base
+            for object_base in objects
+            if getattr(object_base, "block_object", None) is not None
+        }
+        for object_base in objects:
+            node = getattr(object_base, "node", None)
+            block = getattr(object_base, "block_object", None)
+            if node is None or block is None:
                 continue
-            child_blocks = mesh_object.mesh_block_object.child_block_objects
             children = tuple(
-                object_base
-                for object_base in objects
-                if getattr(object_base, "block_object", None) in child_blocks
+                by_block[child]
+                for child in block.relationship_child_block_objects
+                if child in by_block and by_block[child] is not object_base
             )
-            mesh_object.node.set_block_child_objects(children)
+            node.set_block_child_objects(children)
 
     @staticmethod
     def _clear_current_project(

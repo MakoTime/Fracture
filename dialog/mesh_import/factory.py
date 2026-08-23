@@ -9,14 +9,18 @@ from .view import ElevationImportView, MeshImportView
 def create_mesh_import_dialog(
     model: Optional[MeshImportModel] = None,
     parent: Optional[QWidget] = None,
+    deduper=None,
 ) -> MeshImportView:
     """Build a mesh import dialog from optional initial data."""
-    return MeshImportView(model or MeshImportModel(), parent=parent)
+    deduper = deduper or (lambda name: name)
+    return MeshImportView(model or MeshImportModel(), parent=parent, deduper=deduper)
 
 
 def create_elevation_import_dialog(
     model: Optional[MeshImportModel] = None,
     parent: Optional[QWidget] = None,
+    deduper=None,
 ) -> ElevationImportView:
     """Build a dialog for importing image elevation data."""
-    return ElevationImportView(model or MeshImportModel(), parent=parent)
+    deduper = deduper or (lambda name: name)
+    return ElevationImportView(model or MeshImportModel(), parent=parent, deduper=deduper)

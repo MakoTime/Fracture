@@ -10,10 +10,13 @@ def create_mesh_edit_dialog(
     mesh_object,
     colourmaps=(),
     parent: Optional[QWidget] = None,
+    deduper=None,
 ) -> MeshEditView:
     """Build a dialog for editing an existing mesh."""
+    deduper = deduper or (lambda name: name)
     return MeshEditView(
         MeshEditModel.from_mesh_object(mesh_object),
         colourmaps=colourmaps,
         parent=parent,
+        deduper=deduper,
     )

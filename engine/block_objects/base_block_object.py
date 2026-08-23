@@ -14,6 +14,7 @@ class BlockObject(ABC):
         self._parent_block_objects = []
         self._change_parent_block_objects = []
         self._child_block_objects = []
+        self._change_child_block_objects = []
         self._parent_dependencies = {}
         self._child_dependencies = {}
         self._destroyed = False
@@ -37,6 +38,8 @@ class BlockObject(ABC):
             callback(self)
         for parent in tuple(self._parent_block_objects):
             parent._invalidate(visited, force=force)
+        for parent in tuple(self._change_parent_block_objects):
+            parent._invalidate(visited, force=force)
 
     def mark_changed(self):
         """Invalidate this block and every parent that consumes it."""
@@ -59,7 +62,7 @@ class BlockObject(ABC):
         for parent in tuple(self._parent_block_objects):
             parent._mark_changed(visited, invalidates=True)
         for parent in tuple(self._change_parent_block_objects):
-            parent._mark_changed(visited, invalidates=False)
+            parent._mark_changed(visited, invalidates=True)
 
     def add_parent_block_object(self, parent, dependent=False):
         """Register a parent and whether it depends on this block's lifetime."""
@@ -93,15 +96,26 @@ class BlockObject(ABC):
         """Register a child whose changes update this block without scheduling it."""
         if self not in child._change_parent_block_objects:
             child._change_parent_block_objects.append(self)
+        if child not in self._change_child_block_objects:
+            self._change_child_block_objects.append(child)
 
     def remove_change_child_block_object(self, child):
         """Remove a change-only child relationship."""
         if self in child._change_parent_block_objects:
             child._change_parent_block_objects.remove(self)
+        if child in self._change_child_block_objects:
+            self._change_child_block_objects.remove(child)
 
     @property
     def child_block_objects(self):
         return tuple(self._child_block_objects)
+
+    @property
+    def relationship_child_block_objects(self):
+        """Return all registered children, including change relationships."""
+        return tuple(dict.fromkeys(
+            (*self._child_block_objects, *self._change_child_block_objects)
+        ))
 
     def validate(self):
         """Mark the block valid after successful processing."""

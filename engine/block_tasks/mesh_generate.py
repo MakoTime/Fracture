@@ -237,9 +237,14 @@ class MeshGenerateTask:
             raise ValueError("isovalue must contain only finite values")
         if np.any(isovalues < values.min()) or np.any(isovalues > values.max()):
             return pv.PolyData()
+        # Pad below the isovalue so a solid region touching the grid edge is
+        # capped instead of leaving the isosurface open there.
+        padded = np.pad(values, 1, constant_values=values.min())
         image = pv.ImageData(
-            dimensions=values.shape,
+            dimensions=padded.shape,
             spacing=(1.0, 1.0, 1.0),
         )
-        image.point_data["values"] = values.ravel(order="F")
-        return image.contour(isosurfaces=isovalues.tolist(), scalars="values")
+        image.point_data["values"] = padded.ravel(order="F")
+        contour = image.contour(isosurfaces=isovalues.tolist(), scalars="values")
+        contour.translate((-1.0, -1.0, -1.0), inplace=True)
+        return contour

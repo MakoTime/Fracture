@@ -26,6 +26,7 @@ class MeshBlockObject(BlockObject):
     colourmap_field_inversions: tuple[bool, bool] = field(
         default=(False, False), repr=False
     )
+    colourmap_scope: str = field(default="local", repr=False)
 
     __hash__ = BlockObject.__hash__
 
@@ -65,6 +66,13 @@ class MeshBlockObject(BlockObject):
             bool(invert_field1),
             bool(invert_field2),
         )
+        self.mark_changed()
+
+    def set_colourmap_scope(self, scope):
+        scope = str(scope).lower()
+        if scope not in ("local", "global"):
+            raise ValueError("colourmap scope must be 'local' or 'global'")
+        self.colourmap_scope = scope
         self.mark_changed()
 
     BITMAP_EXTENSIONS = {".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff"}
@@ -151,6 +159,11 @@ class MeshBlockObject(BlockObject):
         """Return the renderable dataset held by this block."""
         self._load_scene_data()
         return self.mesh_data
+
+    @property
+    def colourmap_reference_data(self):
+        """Return the dataset driving local colourmap fields for this block."""
+        return self.scene_data
 
     def _load_scene_data(self):
         if self.mesh_data is None:

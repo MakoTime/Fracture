@@ -2,6 +2,7 @@ from PySide6.QtCore import QDate, QDateTime, QTime, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
+    QGroupBox,
     QLabel,
     QDateEdit,
     QTimeEdit,
@@ -65,12 +66,18 @@ class WorldStateView(QWidget):
         rate_row.addWidget(self.rate_combo)
         rate_row.addStretch(1)
 
+        timer_layout = QVBoxLayout()
+        timer_layout.setContentsMargins(8, 8, 8, 8)
+        timer_layout.addWidget(self.media_controls)
+        timer_layout.addLayout(rate_row)
+        timer_group = QGroupBox("Timer")
+        timer_group.setLayout(timer_layout)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
-        layout.addWidget(self.media_controls)
+        layout.addWidget(timer_group)
         layout.addLayout(time_row)
         layout.addLayout(date_row)
-        layout.addLayout(rate_row)
 
         self.advance_timer = QTimer(self)
         self.advance_timer.setInterval(16)

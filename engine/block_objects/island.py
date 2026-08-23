@@ -178,6 +178,11 @@ class IslandBlockObject(BlockObject):
         self.validate()
         return self
 
+    def set_mesh_data(self, mesh_data):
+        """Cache a renderable-adjusted copy so normals aren't recomputed every render."""
+        self.mesh_data = mesh_data
+        return mesh_data
+
     @property
     def scene_data(self):
         if self.mesh_data is None and self.serialised_path is not None:
@@ -191,6 +196,12 @@ class IslandBlockObject(BlockObject):
         return self.mesh_block.colourmap if self.mesh_block is not None else None
 
     @property
+    def colourmap_scope(self):
+        if self.mesh_block is None:
+            return "local"
+        return self.mesh_block.colourmap_scope
+
+    @property
     def colourmap_field_sources(self):
         if self.mesh_block is None:
             return ("elevation", "normal_z")
@@ -201,6 +212,13 @@ class IslandBlockObject(BlockObject):
         if self.mesh_block is None:
             return (False, False)
         return self.mesh_block.colourmap_field_inversions
+
+    @property
+    def colourmap_reference_data(self):
+        """Return the untransformed source mesh driving local colourmap fields."""
+        if self.mesh_block is None:
+            return self.scene_data
+        return self.mesh_block.scene_data
 
     def serialise(self, path):
         output = Path(path)

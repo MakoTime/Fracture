@@ -32,6 +32,12 @@ class ColourmapController:
     def _create_context_menu_for_index(self, index, parent):
         return self.create_context_menu(index.internalPointer(), parent)
 
+    def _deduper(self, exclude=None):
+        model = self.tree_view.model() if hasattr(self.tree_view, "model") else None
+        if isinstance(model, TreeModel):
+            return lambda name: model.next_name(name, exclude=exclude)
+        return lambda name: name
+
     def create_context_menu(self, node, parent=None):
         options = []
         if node is colourmap_root:
@@ -49,6 +55,7 @@ class ColourmapController:
         dialog = create_colourmap_dialog(
             parent=self.parent,
             tree_search=self._tree_search(),
+            deduper=self._deduper(),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
@@ -59,6 +66,7 @@ class ColourmapController:
             model=ColourmapModel.from_object(colourmap),
             parent=self.parent,
             tree_search=self._tree_search(),
+            deduper=self._deduper(exclude=colourmap),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None

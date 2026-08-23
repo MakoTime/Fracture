@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QTabWidget, QTreeView, QWidget
 
 from common.icons import get_icon
+from components.tree import TreeModel, TreeSearch
 from components.tree.roots import island_root, world_config
-from components.tree import TreeSearch
 from objects.mesh_object import MeshObject
 from dialog.island import create_island_dialog
 from engine.block_objects import IslandBlockObject
@@ -26,6 +26,12 @@ class IslandController:
 
     def _create_context_menu_for_index(self, index, parent):
         return self.create_context_menu(index.internalPointer(), parent)
+
+    def _deduper(self):
+        model = self.tree_view.model() if hasattr(self.tree_view, "model") else None
+        if isinstance(model, TreeModel):
+            return model.next_name
+        return lambda name: name
 
     def create_context_menu(self, node, parent=None):
         if node is island_root:
@@ -56,6 +62,8 @@ class IslandController:
             island,
             parent=self.parent,
             source_meshes=source_meshes,
+            deduper=self._deduper(),
+            new_island=True,
             on_apply=lambda result: self._register_new_island(result),
         )
         tabs = self.parent.findChild(QTabWidget, "workspaceTabs") if self.parent else None
@@ -67,7 +75,6 @@ class IslandController:
         return dialog
 
     def _register_new_island(self, island):
-        island.name = "Island"
         self.object_importer.register(island, parent=island_root, add_to_scene=False)
         model = self.tree_view.model()
         if hasattr(model, "refresh"):
@@ -95,16 +102,30 @@ class IslandController:
         return dialog
 
     def _apply(self, island):
-        if self.engine_runner is not None and hasattr(self.engine_runner, "enqueue_block_task"):
-            task = IslandTask(island.block_object)
-            self.engine_runner.enqueue_block_task(
-                f"Update {island.name}",
-                task,
-                on_finished=lambda finished: self._finish(island, finished),
-            )
-        else:
+        self._enqueue_task(island)
+        if self.engine_runner is None or not hasattr(
+            self.engine_runner, "enqueue_block_task"
+        ):
             self.object_importer.refresh_object(island)
         return island
+
+    def _enqueue_task(self, island):
+        if self.engine_runner is None or not hasattr(
+            self.engine_runner, "enqueue_block_task"
+        ):
+            return None
+        task = IslandTask(island.block_object)
+        return self.engine_runner.enqueue_block_task(
+            f"Update {island.name}",
+            task,
+            on_finished=lambda finished: self._finish(island, finished),
+        )
+
+    def bind_loaded_tasks(self, loaded_objects):
+        """Bind regeneration tasks for Islands restored from a project."""
+        for island in loaded_objects:
+            if isinstance(island, Island):
+                self._enqueue_task(island)
 
     def _finish(self, island, task):
         if not getattr(task, "error", None):
@@ -117,6 +138,9 @@ class IslandController:
             else:
                 island.remove_from_scene()
             self.object_importer.refresh_object(island)
+            model = self.tree_view.model()
+            if hasattr(model, "refresh"):
+                model.refresh()
 
     def delete(self, island):
         if self.object_importer.confirm_remove(island, parent=self.parent):

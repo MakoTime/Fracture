@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
+    QLineEdit,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -13,12 +14,13 @@ import numpy as np
 
 from components.scene import SceneViewer
 from dialog.base.tab_editor import TabEditorView
+from tools.widgets import NameField
 
 
 class IslandView(TabEditorView):
     """Workspace for configuring an Island with a live scene preview."""
 
-    def __init__(self, model, parent=None, on_apply=None, on_close=None):
+    def __init__(self, model, parent=None, on_apply=None, on_close=None, deduper=None):
         super().__init__(model, parent=parent, on_apply=on_apply, on_close=on_close)
         self.setWindowTitle("Configure Island")
         self.resize(980, 620)
@@ -26,6 +28,9 @@ class IslandView(TabEditorView):
         self._preview_host = QWidget(self)
         self._preview_layout = QVBoxLayout(self._preview_host)
         self._preview_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.name = NameField(model.name, deduper)
+        self.name.setAccessibleName("Island name")
 
         self.offset = QDoubleSpinBox()
         self.offset.setRange(0.0, 1_000_000.0)
@@ -67,6 +72,7 @@ class IslandView(TabEditorView):
         orbit_group.setLayout(orbit_form)
 
         placement_form = QFormLayout()
+        placement_form.addRow("Name", self.name)
         placement_form.addRow("Source mesh", self.source_mesh)
         placement_form.addRow("Core offset", self.offset)
         placement_form.addRow("Geometry", self.curve_mesh)
@@ -138,6 +144,7 @@ class IslandView(TabEditorView):
         return field
 
     def update_model(self):
+        self.model.name = self.name.text().strip() or "Island"
         self.model.core_offset = self.offset.value()
         self.model.source_mesh = self.source_mesh.currentData()
         self.model.orbit_speed = self.orbit_speed.value()
@@ -190,8 +197,10 @@ class IslandView(TabEditorView):
                 render_points_as_spheres=True, reset_camera=False,
             )
             if self.model.show_path and mesh is not None:
-                self.preview.plotter.add_mesh(
-                    self.model.path(), color="#8fd3c7", line_width=2,
-                    reset_camera=False,
-                )
+                path = self.model.path()
+                if path.n_points:
+                    self.preview.plotter.add_mesh(
+                        path, color="#8fd3c7", line_width=2,
+                        reset_camera=False,
+                    )
         self.preview.reset_camera()

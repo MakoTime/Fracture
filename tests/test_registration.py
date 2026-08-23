@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pyvista as pv
 from PySide6.QtCore import QEventLoop, QTimer, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QWidget
@@ -20,13 +21,15 @@ from dialog.mesh_generate import GenerateMeshWindow, MeshGenerateModel
 from dialog.mesh_mask import SurfaceMaskModel
 from dialog.mesh_mask.view import MaskCanvas
 from dialog.mesh_edit.model import MeshEditModel
-from engine.block_objects import MeshBlockObject
+from engine.block_objects import IslandBlockObject, MeshBlockObject
 from engine.block_tasks import MeshImportTask
+from engine.block_tasks import IslandTask
 from engine.block_tasks import MeshGenerateTask
 from engine.block_tasks import MeshFilterTask
 from engine.block_tasks.generated_mesh import GeneratedMeshTask
 from engine.block_objects import GeneratedMeshBlockObject
 from objects.mesh_object import MeshObject
+from objects.island import Island
 from objects.generated_mesh import GeneratedMesh
 from application.importers import MeshImportController, ObjectImporterModel
 from application.importers import TransformController
@@ -38,6 +41,7 @@ from dialog.mesh_filter import MeshFilterModel
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from objects.object_base import ObjectBase
 from components.scene import ShapeController
+from components.table import TableManager, TableModel, TableView
 
 
 def _perlin_transform(size=4, seed=0, amplitude=1.0):
@@ -210,7 +214,7 @@ def test_generate_mesh_opens_standalone_window(qapp):
 
 
 def test_generate_mesh_flexible_checkbox_controls_grid_size_editing(qapp):
-    window = GenerateMeshWindow()
+    window = GenerateMeshWindow(deduper=lambda name: name)
 
     assert window.flexible_grid.isChecked()
     assert window.grid_size.isEnabled()
@@ -254,7 +258,7 @@ def test_generate_mesh_resizes_flexible_masks_with_grid():
 
 
 def test_generate_mesh_grid_point_alpha_slider_updates_preview_setting(qapp):
-    window = GenerateMeshWindow()
+    window = GenerateMeshWindow(deduper=lambda name: name)
 
     window.grid_point_alpha.setValue(35)
 
@@ -594,7 +598,7 @@ def test_generated_mesh_rejects_non_finite_scalar_values():
 
 def test_generate_mesh_apply_creates_mesh(qapp):
     generated = []
-    window = GenerateMeshWindow(on_apply=generated.append)
+    window = GenerateMeshWindow(on_apply=generated.append, deduper=lambda name: name)
     window.name_field.setText("Applied Grid")
     window.grid_size.set_value((2, 2, 2))
 
@@ -726,7 +730,7 @@ def test_mesh_filter_noise_mask_removes_values_outside_noise_range():
     assert np.any(task.grid_data == 1.0)
 
 
-def test_mesh_filter_uses_source_transform_without_invalidating_source_mesh():
+def test_mesh_filter_uses_source_transform_and_invalidates_source_mesh():
     transform = _perlin_transform(size=4)
     source = GeneratedMesh(
         "Source",
@@ -751,7 +755,7 @@ def test_mesh_filter_uses_source_transform_without_invalidating_source_mesh():
     filtered.mesh_block_object.validate()
     transform.block_object.invalidate(force=True)
 
-    assert source.mesh_block_object.is_valid()
+    assert not source.mesh_block_object.is_valid()
     assert not filtered.mesh_block_object.is_valid()
 
 
@@ -1040,6 +1044,103 @@ def test_shape_controller_attaches_table_interface_and_owns_shapes():
     assert scene.removed == [(object_base, shape)]
 
 
+def test_island_registers_orbit_shape_with_orbit_icon_button(qapp):
+    from components.tree import TreeManager
+    from engine.block_objects import IslandBlockObject, MeshBlockObject, WorldConfigBlockObject
+    from objects.island import Island
+    import pyvista as pv
+
+    class FakeScene:
+        def add_object(self, object_base):
+            del object_base
+
+        def add_shape(self, object_base, shape):
+            del object_base, shape
+
+        def set_shape_visibility(self, object_base, shape, visible):
+            del object_base, shape, visible
+            return True
+
+        def remove_shape(self, object_base, shape):
+            del object_base, shape
+            return True
+
+        def remove_object(self, object_base):
+            del object_base
+            return True
+
+    table_manager = TableManager()
+    table_model = TableModel(table_manager)
+    scene = FakeScene()
+    importer = ObjectImporterModel(
+        table_model=table_model,
+        tree_manager=TreeManager(),
+        scene_viewer=scene,
+    )
+    island = Island(
+        block_object=IslandBlockObject(
+            mesh_block=MeshBlockObject(mesh_data=pv.Sphere()),
+            world_config=WorldConfigBlockObject(),
+            core_offset=5.0,
+        )
+    )
+    island.block_object.commit(island.block_object.process(island.block_object.prepare()))
+    importer.register(island)
+    table = TableView(table_manager=table_manager)
+
+    button = table.indexWidget(table.model().index(0, table.model().SHAPES))
+    assert button is not None
+    assert not button.icon().isNull()
+    assert button.isChecked()
+    button.click()
+    assert island.orbit_shape.visible is False
+
+    island.destroy()
+    table.close()
+
+
+def test_scene_uses_unique_actor_names_for_multiple_islands():
+    import pyvista as pv
+    from engine.block_objects import IslandBlockObject, MeshBlockObject, WorldConfigBlockObject
+    from objects.island import Island
+    from components.scene.view import SceneViewer
+
+    class FakeActor:
+        def SetVisibility(self, visible):
+            self.visible = visible
+
+    class FakePlotter:
+        def __init__(self):
+            self.names = []
+
+        def add_mesh(self, payload, name, **kwargs):
+            del payload, kwargs
+            self.names.append(name)
+            return FakeActor()
+
+    viewer = SceneViewer.__new__(SceneViewer)
+    viewer.plotter = FakePlotter()
+    viewer.scene_model = SimpleNamespace(add_object=lambda object_base: None)
+    viewer.reset_camera = lambda: None
+    viewer._actors = {}
+
+    islands = []
+    for angle in (0.0, 90.0):
+        block = IslandBlockObject(
+            mesh_block=MeshBlockObject(mesh_data=pv.Sphere()),
+            world_config=WorldConfigBlockObject(),
+            core_offset=5.0,
+            orbit_angle=angle,
+        )
+        block.commit(block.process(block.prepare()))
+        islands.append(Island(block_object=block))
+
+    viewer.add_object(islands[0])
+    viewer.add_object(islands[1])
+
+    assert len(set(viewer.plotter.names)) == 2
+
+
 def test_table_remove_unloads_object_but_keeps_tree_node(qapp):
     class FakeScene:
         def __init__(self):
@@ -1104,6 +1205,33 @@ def test_island_delete_refreshes_tree_model_after_removal():
         assert model.refresh_count == 1
     finally:
         object_base.remove_from_tree()
+
+
+def test_island_controller_binds_loaded_island_regeneration_task():
+    queued = []
+    source = MeshBlockObject(mesh_data=pv.Sphere())
+    island = Island(
+        block_object=IslandBlockObject(
+            mesh_block=source,
+            world_config=world_config.block_object,
+        ),
+        auto_register_root=False,
+    )
+    runner = SimpleNamespace(
+        enqueue_block_task=lambda name, task, on_finished=None: queued.append(
+            (name, task, on_finished)
+        )
+    )
+    controller = IslandController(
+        object_importer=SimpleNamespace(),
+        tree_view=SimpleNamespace(model=lambda: None),
+        engine_runner=runner,
+    )
+
+    controller.bind_loaded_tasks([island])
+
+    assert len(queued) == 1
+    assert isinstance(queued[0][1], IslandTask)
 
 
 def test_show_mesh_restores_scene_and_table_pipeline(qapp):

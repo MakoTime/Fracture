@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QTimer, Qt
 
 from components.scene import SceneViewer
-from tools.widgets import VisibleWidget
+from tools.widgets import NameField, VisibleWidget
 
 from dialog.base.tab_editor import TabEditorView
 
@@ -29,6 +29,7 @@ class MeshFilterView(TabEditorView):
         parent=None,
         on_apply=None,
         on_close=None,
+        deduper=None,
     ):
         TabEditorView.__init__(
             self,
@@ -49,8 +50,7 @@ class MeshFilterView(TabEditorView):
             control.setRange(0.0, 1.0)
             control.setDecimals(3)
             control.setSingleStep(0.01)
-        self.name = QLineEdit()
-        self.name.setPlaceholderText("Filtered Mesh")
+        self.name = NameField(model.name, deduper)
         self.name.setAccessibleName("New filtered mesh name")
         self.name.setText(model.name)
         self.show_original = VisibleWidget(True)
@@ -140,7 +140,7 @@ class MeshFilterView(TabEditorView):
         )
 
     def update_model(self):
-        self.model.name = self.name.text().strip() or "Filtered Mesh"
+        self.model.name = self.name.unique_name() or "Filtered Mesh"
         self.model.noise_enabled = self.enabled.isChecked()
         self.model.noise_minimum = self.minimum.value()
         self.model.noise_maximum = self.maximum.value()

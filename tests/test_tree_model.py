@@ -29,6 +29,41 @@ def test_tree_model_tracks_expansion_state(qapp):
     assert model.is_expanded(index) is True
 
 
+def test_tree_model_generates_three_digit_duplicate_names():
+    first = PerlinNoiseTransformModel(name="Noise").to_object()
+    second = PerlinNoiseTransformModel(name="Noise 001").to_object()
+    try:
+        model = TreeModel([first.node, second.node])
+
+        assert model.is_name_used("Noise")
+        assert model.next_name("Noise") == "Noise 002"
+        assert model.next_name("Other") == "Other"
+    finally:
+        first.remove_from_tree()
+        second.remove_from_tree()
+
+
+def test_tree_model_renames_object_with_duplicate_name_handler():
+    first = PerlinNoiseTransformModel(name="Noise").to_object()
+    second = PerlinNoiseTransformModel(name="Other").to_object()
+    try:
+        model = TreeModel(
+            [first.node, second.node],
+            duplicate_name_handler=lambda name, obj: model.next_name(
+                name, exclude=obj
+            ),
+        )
+
+        assert model.setData(model.index(1, 0), "Noise", Qt.EditRole)
+        assert second.name == "Noise 001"
+        assert second.block_object.name == "Noise 001"
+        assert model.setData(model.index(1, 0), "Noise", Qt.EditRole)
+        assert second.name == "Noise 001"
+    finally:
+        first.remove_from_tree()
+        second.remove_from_tree()
+
+
 def test_tree_model_refreshes_after_children_change(qapp):
     root = TreeNode("Root")
     model = TreeModel([root])

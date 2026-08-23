@@ -82,6 +82,7 @@ def test_project_round_trip_saves_mesh_block_and_scene_state(tmp_path):
         guid="saved-guid",
         visible=False,
     )
+    mesh.set_colourmap_scope("global")
     importer.register(mesh, parent=mesh_root, add_to_scene=True)
     mesh.set_visible(False)
 
@@ -92,6 +93,10 @@ def test_project_round_trip_saves_mesh_block_and_scene_state(tmp_path):
 
     saved_data = json.loads(project_file.read_text(encoding="utf-8"))
     assert saved_data["world_config"]["centre"] == [9.0, 8.0, 7.0]
+    saved_mesh = next(
+        item for item in saved_data["objects"] if item["guid"] == "saved-guid"
+    )
+    assert saved_mesh["colourmap_scope"] == "global"
     world_config.update_configuration(centre=(1.0, 2.0, 3.0))
 
     assert project_file.name == "project.json"
@@ -119,6 +124,7 @@ def test_project_round_trip_saves_mesh_block_and_scene_state(tmp_path):
     assert restored.mesh_block_object.name == "Saved terrain"
     assert restored.mesh_block_object.guid == "saved-guid"
     assert restored.mesh_block_object.comments == "round trip"
+    assert restored.mesh_block_object.colourmap_scope == "global"
     assert restored.source_path == ""
     assert restored.scale == (1.0, 1.0, 1.0)
     assert restored.node.parent is mesh_root
@@ -208,6 +214,7 @@ def test_project_round_trip_preserves_island_orbital_configuration(tmp_path):
     assert restored.block_object.curve_mesh is True
     assert restored.block_object.mesh_block is not None
     assert restored.block_object.world_config is world_config.block_object
+    assert restored.show_in_scene is True
     restored_source = mesh_root.children[0].node_object
     restored.destroy()
     restored_source.destroy()

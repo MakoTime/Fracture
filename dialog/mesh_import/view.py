@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from tools.widgets.vector import Vector3Widget
+from tools.widgets import NameField
 
 from .model import MeshImportModel
 
@@ -30,9 +31,10 @@ class MeshImportView(QDialog):
         "All files (*)"
     )
 
-    def __init__(self, model: MeshImportModel, parent=None):
+    def __init__(self, model: MeshImportModel, parent=None, deduper=None):
         super().__init__(parent)
         self.model = model
+        self._deduper = deduper
         self.setWindowTitle("Import Mesh")
         self.resize(520, 520)
         self._build_ui()
@@ -48,7 +50,7 @@ class MeshImportView(QDialog):
         source_layout.addWidget(self.source_path, 1)
         source_layout.addWidget(self.browse_button)
 
-        self.name = QLineEdit()
+        self.name = NameField(self.model.name, self._deduper)
         self.comments = QTextEdit()
         self.comments.setPlaceholderText("Optional notes about this mesh")
         self.comments.setMinimumHeight(72)
@@ -102,7 +104,7 @@ class MeshImportView(QDialog):
     def update_model(self) -> MeshImportModel:
         """Copy the current widget values into and return the model."""
         self.model.source_path = self.source_path.text().strip()
-        self.model.name = self.name.text().strip() or "Imported Mesh"
+        self.model.name = self.name.unique_name() or "Imported Mesh"
         self.model.comments = self.comments.toPlainText()
         self.model.add_to_scene = self.add_to_scene.isChecked()
         self.model.scale = self.scale.value()
@@ -132,8 +134,8 @@ class ElevationImportView(MeshImportView):
 
     MESH_FILTER = "Elevation images (*.bmp *.jpg *.jpeg *.png *.tif *.tiff);;All files (*)"
 
-    def __init__(self, model: MeshImportModel, parent=None):
-        super().__init__(model, parent)
+    def __init__(self, model: MeshImportModel, parent=None, deduper=None):
+        super().__init__(model, parent, deduper=deduper)
         self.setWindowTitle("Import Mesh from Elevation Data")
         self._build_elevation_controls()
         self.set_model(model)

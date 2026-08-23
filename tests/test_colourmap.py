@@ -100,7 +100,7 @@ def test_mesh_block_can_attach_a_colourmap():
     assert colourmap not in mesh.child_block_objects
 
 
-def test_destroying_mesh_colourmap_detaches_without_invalidating_parent_mesh():
+def test_destroying_mesh_colourmap_detaches_and_invalidates_parent_mesh():
     colourmap = ColourmapBlockObject()
     mesh = MeshBlockObject(colourmap=colourmap)
 
@@ -108,10 +108,10 @@ def test_destroying_mesh_colourmap_detaches_without_invalidating_parent_mesh():
 
     assert not mesh.is_destroyed()
     assert mesh.colourmap is None
-    assert mesh.is_valid()
+    assert not mesh.is_valid()
 
 
-def test_changing_child_colourmap_notifies_but_does_not_invalidate_parent_mesh():
+def test_changing_child_colourmap_invalidates_parent_mesh():
     colourmap = ColourmapBlockObject()
     mesh = MeshBlockObject(colourmap=colourmap)
     mesh.validate()
@@ -120,7 +120,7 @@ def test_changing_child_colourmap_notifies_but_does_not_invalidate_parent_mesh()
     colourmap.mark_changed()
 
     assert not colourmap.is_valid()
-    assert mesh.is_valid()
+    assert not mesh.is_valid()
 
 
 def test_destroying_colourmap_noise_invalidates_mesh_even_if_already_invalid():
@@ -137,7 +137,7 @@ def test_destroying_colourmap_noise_invalidates_mesh_even_if_already_invalid():
     assert colourmap.perlin_noise_transform is None
     assert not colourmap.noise_enabled
     assert not colourmap.is_valid()
-    assert mesh.is_valid()
+    assert not mesh.is_valid()
 
 
 def test_mesh_colourmap_model_applies_field_sources():
@@ -156,6 +156,15 @@ def test_mesh_colourmap_model_applies_field_sources():
     assert mesh.colourmap is colourmap
     assert mesh.colourmap_field_sources == ("normal_z", "elevation")
     assert mesh.colourmap_field_inversions == (True, False)
+
+
+def test_mesh_colourmap_model_applies_global_scope():
+    mesh = MeshBlockObject()
+    model = MeshColourmapModel(scope="global")
+
+    model.apply(mesh)
+
+    assert mesh.colourmap_scope == "global"
 
 
 def test_mesh_colourmap_preview_data_is_decoupled_from_mesh():

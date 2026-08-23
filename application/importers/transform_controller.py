@@ -39,7 +39,10 @@ class TransformController:
         return self.create_context_menu(index.internalPointer(), parent)
 
     def create_perlin_noise_transform(self):
-        dialog = create_perlin_noise_transform_dialog(parent=self.parent)
+        dialog = create_perlin_noise_transform_dialog(
+            parent=self.parent,
+            deduper=self.tree_view.model().next_name,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
         return self._register(dialog.update_model().to_object())
@@ -103,7 +106,13 @@ class TransformController:
             application_mode=block.application_mode,
             penetration=block.penetration,
         )
-        dialog = create_perlin_noise_transform_dialog(model, parent=self.parent)
+        dialog = create_perlin_noise_transform_dialog(
+            model,
+            parent=self.parent,
+            deduper=lambda name: self.tree_view.model().next_name(
+                name, exclude=transform
+            ),
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
         updated = dialog.update_model()

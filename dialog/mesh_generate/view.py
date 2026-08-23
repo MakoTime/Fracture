@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from tools.widgets import NameField
 
 import numpy as np
 import pyvista as pv
@@ -132,7 +133,7 @@ class GenerateMeshWindow(TabEditorView):
     GRID_POINT_SIZE_MAX = 9.0
     GRID_POINT_SIZE_REFERENCE_COUNT = 1_000
 
-    def __init__(self, parent=None, model=None, on_apply=None, tree_search=None):
+    def __init__(self, parent=None, model=None, on_apply=None, tree_search=None, deduper=None):
         TabEditorView.__init__(
             self,
             model or MeshGenerateModel(),
@@ -151,9 +152,7 @@ class GenerateMeshWindow(TabEditorView):
         self._preview_ready = False
         self._preview_layout = QVBoxLayout(self._preview_host)
         self._preview_layout.setContentsMargins(0, 0, 0, 0)
-        self.name_field = QLineEdit()
-        self.name_field.setPlaceholderText("Generated Mesh")
-        self.name_field.setText(self.model.name)
+        self.name_field = NameField(self.model.name, deduper)
         self.name_field.setAccessibleName("Generated mesh name")
         self.grid_size = IntegerVector3Widget()
         self.grid_size.set_value(self.model.grid_size)
@@ -273,7 +272,7 @@ class GenerateMeshWindow(TabEditorView):
             self._reset_camera = False
 
     def apply_model(self):
-        self.model.name = self.name_field.text().strip() or "Generated Mesh"
+        self.model.name = self.name_field.unique_name() or "Generated Mesh"
         self.model.grid_size = self.grid_size.value()
         self.model.show_grid = self.grid_visibility.is_visible()
         self.model.show_mask_surface = self.show_mask_surface.is_visible()
@@ -287,6 +286,7 @@ class GenerateMeshWindow(TabEditorView):
     def _grid_size_changed(self):
         if not self.flexible_grid.isChecked():
             return
+        self.model.grid_size = self.grid_size.value()
         for axis in "xyz":
             mask = self.model.get_mask(axis)
             if mask is not None and mask.shape != self.model.mask_shape(axis):

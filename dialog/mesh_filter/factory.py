@@ -11,10 +11,13 @@ def create_mesh_filter_dialog(
     parent: Optional[QWidget] = None,
     on_apply=None,
     transforms=(),
+    deduper=None,
 ) -> MeshFilterView:
+    deduper = deduper or (lambda name: name)
     return MeshFilterView(
         model,
         transforms=transforms,
         parent=parent,
         on_apply=on_apply,
+        deduper=deduper,
     )

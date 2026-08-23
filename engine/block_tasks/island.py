@@ -74,6 +74,20 @@ def build_island_mesh(prepared):
     )
     current_position = centre + radius * radial_direction
     mesh.translate(-np.asarray(mesh.center), inplace=True)
+    if prepared.get("curve_mesh", False) and radius > 1e-12:
+        local_points = np.asarray(mesh.points).copy()
+        tangent_angle = local_points[:, 0] / radius
+        up_angle = local_points[:, 1] / radius
+        arc_radius = radius + local_points[:, 2]
+        curved_points = np.empty_like(local_points)
+        curved_points[:, 0] = (
+            arc_radius * np.sin(tangent_angle) * np.cos(up_angle)
+        )
+        curved_points[:, 1] = arc_radius * np.sin(up_angle)
+        curved_points[:, 2] = (
+            arc_radius * np.cos(tangent_angle) * np.cos(up_angle) - radius
+        )
+        mesh.points = curved_points
     rotation = np.column_stack((tangent_direction, local_up, radial_direction))
     mesh.points = np.asarray(mesh.points) @ rotation.T
     mesh.translate(current_position, inplace=True)

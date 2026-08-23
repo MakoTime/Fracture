@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QDialog, QTreeView, QWidget
 
+from components.tree import TreeModel
 from components.tree.roots import world_config
 from dialog.world_config import create_world_config_dialog
 from tools.dropdown import create_dropdown_menu
@@ -28,7 +29,14 @@ class WorldConfigController:
         )
 
     def edit(self):
-        dialog = create_world_config_dialog(world_config, parent=self.parent)
+        model = self.tree_view.model() if hasattr(self.tree_view, "model") else None
+        if isinstance(model, TreeModel):
+            deduper = lambda name: model.next_name(name, exclude=world_config)
+        else:
+            deduper = lambda name: name
+        dialog = create_world_config_dialog(
+            world_config, parent=self.parent, deduper=deduper
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
         return dialog.apply_changes()

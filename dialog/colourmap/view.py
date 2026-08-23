@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
 )
+from tools.widgets import NameField
 
 from components.tree import TreeSearch
 from engine.block_objects import PerlinNoiseTransformBlockObject
@@ -31,14 +32,14 @@ from common.icons import get_icon
 class ColourmapView(QDialog):
     """Editor for colourmap stops and its optional noise transform."""
 
-    def __init__(self, model=None, parent=None, tree_search=None):
+    def __init__(self, model=None, parent=None, tree_search=None, deduper=None):
         super().__init__(parent)
         self.model = model or ColourmapModel()
         self.tree_search = tree_search
         self.setWindowTitle("Colourmap")
         self.resize(1040, 620)
 
-        self.name_field = QLineEdit()
+        self.name_field = NameField(self.model.name, deduper)
         self.field1_name_field = QLineEdit()
         self.field2_name_field = QLineEdit()
         self.comments_field = QLineEdit()
@@ -394,7 +395,7 @@ class ColourmapView(QDialog):
             self._update_axis_graph()
 
     def update_model(self):
-        self.model.name = self.name_field.text().strip() or "Colourmap"
+        self.model.name = self.name_field.unique_name() or "Colourmap"
         self.model.field1_name = self.field1_name_field.text().strip() or "Field 1"
         self.model.field2_name = self.field2_name_field.text().strip() or "Field 2"
         self.model.comments = self.comments_field.text()

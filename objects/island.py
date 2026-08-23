@@ -1,5 +1,6 @@
 from typing import Optional
 
+import numpy as np
 from PySide6.QtGui import QIcon
 
 from common.icons import get_icon
@@ -65,3 +66,23 @@ class Island(ObjectBase):
     def update_at_time(self, elapsed_seconds, delta_seconds=0.0):
         del delta_seconds
         return self.block_object.orbit_transform_at_time(elapsed_seconds)
+
+    def register_shapes(self, shape_interface):
+        if self.block_object.world_config is None or shape_interface.shapes:
+            return
+        from engine.block_tasks.island import _orbit_frame
+
+        centre = np.asarray(self.block_object.world_config.centre, dtype=float)
+        angles = np.linspace(0.0, 360.0, 96)
+        points = []
+        for angle in angles:
+            radial, _, _ = _orbit_frame(
+                np.asarray(self.orbit_normal), angle
+            )
+            points.append(centre + self.core_offset * radial)
+        self.orbit_shape = shape_interface.add_line(
+            points,
+            name="Orbit",
+            color="#8fd3c7",
+            line_width=2,
+        )

@@ -5,6 +5,7 @@ from .play_pause import PlayPauseWidget
 from .transport import FastForwardWidget, RewindWidget
 from .visible import VisibleWidget
 from .bezier_graph import BezierCurveGraph
+from .name import NameField
 
 __all__ = [
 	"FastForwardWidget",
@@ -16,4 +17,5 @@ __all__ = [
 	"Vector3Widget",
 	"VisibleWidget",
 	"BezierCurveGraph",
+	"NameField",
 ]

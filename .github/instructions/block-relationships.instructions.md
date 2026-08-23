@@ -23,6 +23,8 @@ Block relationships are directional. A child provides data to a parent, and the 
 - Keep both sides of every relationship synchronized through the public relationship methods.
 - Use stable block GUIDs for task bindings and serialization identity, not object identity alone.
 - Do not create a relationship merely to share a value; create one when the parent must respond to the child's state or lifetime.
+- When both sides are represented by project objects, every registered block relationship must also be visible as a child alias in the parent object's tree node.
+- Tree aliases must be synchronized after object registration and project deserialization, and must not duplicate the child's canonical tree node.
 
 ## Normal Child Relationships
 

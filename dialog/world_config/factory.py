@@ -6,6 +6,9 @@ from .model import WorldConfigModel
 from .view import WorldConfigView
 
 
-def create_world_config_dialog(world_config, parent: Optional[QWidget] = None):
+def create_world_config_dialog(world_config, parent: Optional[QWidget] = None, deduper=None):
     """Build the world configuration editor."""
-    return WorldConfigView(WorldConfigModel.from_object(world_config), parent=parent)
+    deduper = deduper or (lambda name: name)
+    return WorldConfigView(
+        WorldConfigModel.from_object(world_config), parent=parent, deduper=deduper
+    )

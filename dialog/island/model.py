@@ -12,6 +12,7 @@ class IslandModel(EditorModel):
     """Editable Island placement and preview state."""
 
     island: object
+    name: str = "Island"
     source_mesh: object | None = None
     source_meshes: tuple = ()
     core_offset: float = 0.0
@@ -28,6 +29,7 @@ class IslandModel(EditorModel):
         block = island.block_object
         return cls(
             island=island,
+            name=island.name,
             source_mesh=None,
             core_offset=block.core_offset,
             orbit_speed=block.orbit_speed,
@@ -75,6 +77,9 @@ class IslandModel(EditorModel):
 
     def apply(self):
         self.validate()
+        name = self.name.strip() or "Island"
+        self.island._on_name_changed(name)
+        self.island.block_object.name = name
         self.island.block_object.update_configuration(
             core_offset=self.core_offset,
             orbit_speed=self.orbit_speed,
@@ -115,7 +120,7 @@ class IslandModel(EditorModel):
         centre = np.asarray(self.island.block_object.world_config.centre)
         radius = float(self.core_offset)
         if radius <= 1e-12:
-            return pv.PolyData(centre).delaunay_3d().extract_geometry()
+            return pv.PolyData(centre)
         angles = np.linspace(0.0, 360.0, samples)
         points = []
         for orbit_angle in angles:

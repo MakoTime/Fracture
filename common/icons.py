@@ -23,6 +23,7 @@ FOLDER_EXPANDED_ICON = _icon("folder_expanded.svg")
 GRID_ICON = _icon("grid.svg")
 INFO_ICON = _icon("info.svg")
 MAP_ICON = _icon("map.svg")
+ORBIT_ICON = _icon("orbit.svg")
 NOTES_ICON = _icon("notes.svg")
 PAUSE_ICON = _icon("pause.svg")
 PLAY_ICON = _icon("play.svg")
@@ -54,6 +55,7 @@ ICONS = {
 	"grid": GRID_ICON,
 	"info": INFO_ICON,
 	"map": MAP_ICON,
+	"orbit": ORBIT_ICON,
 	"notes": NOTES_ICON,
 	"pause": PAUSE_ICON,
 	"play": PLAY_ICON,

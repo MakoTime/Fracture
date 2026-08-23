@@ -15,6 +15,7 @@ class MeshColourmapModel:
     field2_source: str = "normal_z"
     invert_field1: bool = False
     invert_field2: bool = False
+    scope: str = "local"
 
     SOURCES = (
         ("elevation", "Relative elevation"),
@@ -71,6 +72,7 @@ class MeshColourmapModel:
             field2_source=mesh_object.colourmap_field_sources[1],
             invert_field1=mesh_object.colourmap_field_inversions[0],
             invert_field2=mesh_object.colourmap_field_inversions[1],
+            scope=getattr(mesh_object.block_object, "colourmap_scope", "local"),
         )
 
     def preview_data(self):
@@ -136,4 +138,5 @@ class MeshColourmapModel:
             self.invert_field1,
             self.invert_field2,
         )
+        mesh_object.set_colourmap_scope(self.scope)
         return mesh_object

@@ -17,6 +17,7 @@ from application.importers.colourmap_controller import ColourmapController
 from application.importers.world_config_controller import WorldConfigController
 from application.importers.island_controller import IslandController
 from application.project_serializer import ProjectSerializer
+from dialog.notify import create_notification
 
 
 class ProjectController:
@@ -38,7 +39,10 @@ class ProjectController:
         self.window.table_manager = self.table_manager
         self.window.tree_manager = self.tree_manager
         self.window.treeWidget.setHeaderHidden(True)
-        self.tree_model = TreeModel(root_objects.get_nodes())
+        self.tree_model = TreeModel(
+            root_objects.get_nodes(),
+            duplicate_name_handler=self._resolve_duplicate_name,
+        )
         self.window.treeWidget.setModel(self.tree_model)
         self.window.tableView.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Interactive
@@ -112,6 +116,19 @@ class ProjectController:
             )
         return self.window
 
+    def _resolve_duplicate_name(self, name, object_base):
+        next_name = self.tree_model.next_name(name, exclude=object_base)
+        dialog = create_notification(
+            "Duplicate name",
+            f"The name '{name}' is already in use.\n"
+            f"Click OK to use '{next_name}' instead, or Cancel to revert.",
+            parent=self.window,
+            confirm=True,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return next_name
+
     def _configure_scene_splitters(self):
         """Set compact defaults while keeping all Scene panels resizable."""
         dock_splitter = self.window.sceneDockSplitter
@@ -139,7 +156,11 @@ class ProjectController:
     def _lock_scene_docks(self):
         """Keep Scene-tab panels embedded and resizable without controls."""
         dock_features = QDockWidget.DockWidgetFeature.NoDockWidgetFeatures
-        for dock_name in ("sceneDockWidget", "worldStateDockWidget"):
+        for dock_name in (
+            "treeDockWidget",
+            "sceneDockWidget",
+            "worldStateDockWidget",
+        ):
             dock = self.window.findChild(QDockWidget, dock_name)
             if dock is not None:
                 dock.setFeatures(dock_features)

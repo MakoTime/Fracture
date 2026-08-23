@@ -1,3 +1,5 @@
+import re
+
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
 from PySide6.QtGui import QIcon
 
@@ -84,9 +86,10 @@ class TreeManager:
 class TreeModel(QAbstractItemModel):
     """Custom model for managing hierarchical data."""
 
-    def __init__(self, root_data):
+    def __init__(self, root_data, duplicate_name_handler=None):
         super().__init__()
         self.root_data = root_data
+        self.duplicate_name_handler = duplicate_name_handler
 
     def rowCount(self, parent=QModelIndex()):
         if not parent.isValid():
@@ -105,6 +108,70 @@ class TreeModel(QAbstractItemModel):
         if role == Qt.DecorationRole:
             return node.icon
         return None
+
+    def flags(self, index):
+        flags = super().flags(index)
+        if index.isValid() and index.internalPointer().node_object is not None:
+            flags |= Qt.ItemFlag.ItemIsEditable
+        return flags
+
+    def setData(self, index, value, role=Qt.EditRole):
+        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
+            return False
+        node = index.internalPointer()
+        object_base = node.node_object
+        if object_base is None:
+            return False
+        name = str(value).strip()
+        if not name:
+            return False
+        if self.is_name_used(name, exclude=object_base):
+            if self.duplicate_name_handler is None:
+                return False
+            name = self.duplicate_name_handler(name, object_base)
+            if name is None:
+                return False
+        object_base._on_name_changed(name)
+        block_object = getattr(object_base, "block_object", None)
+        if block_object is not None:
+            block_object.name = name
+        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])
+        return True
+
+    def names(self, exclude=None):
+        names = set()
+        seen = set()
+
+        def collect(node):
+            object_base = node.node_object
+            if object_base is not None:
+                identity = id(object_base)
+                if identity not in seen:
+                    seen.add(identity)
+                    if object_base is not exclude:
+                        names.add(str(getattr(object_base, "name", "")))
+            for child in node.children:
+                collect(child)
+
+        for root in self.root_data:
+            collect(root)
+        return names
+
+    def is_name_used(self, name, exclude=None):
+        return str(name).strip() in self.names(exclude=exclude)
+
+    def next_name(self, prefix, exclude=None):
+        prefix = str(prefix).strip() or "Object"
+        match = re.match(r"^(.*) \d{3}$", prefix)
+        if match:
+            prefix = match.group(1)
+        names = self.names(exclude=exclude)
+        if prefix not in names:
+            return prefix
+        number = 1
+        while f"{prefix} {number:03d}" in names:
+            number += 1
+        return f"{prefix} {number:03d}"
 
     def index(self, row, column, parent=QModelIndex()):
         if not self.hasIndex(row, column, parent):

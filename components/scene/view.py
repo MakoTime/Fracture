@@ -24,7 +24,7 @@ class SceneViewer(QWidget):
         self.plotter = QtInteractor(self)
         self._pan_anchor = None
         self._pan_active = False
-        self._pan_render_pending = False
+        self._render_pending = False
         self.plotter.interactor.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._configure_terrain_interaction()
         self.plotter.interactor.installEventFilter(self)
@@ -137,16 +137,17 @@ class SceneViewer(QWidget):
         camera.SetPosition(camera.GetPosition() + movement)
         camera.SetFocalPoint(camera.GetFocalPoint() + movement)
         self._pan_anchor = position
-        self._schedule_pan_render()
+        self._schedule_render()
 
-    def _schedule_pan_render(self):
-        if self._pan_render_pending:
+    def _schedule_render(self):
+        """Coalesce rapid render requests (panning, per-tick transforms) into one frame."""
+        if self._render_pending:
             return
-        self._pan_render_pending = True
-        QTimer.singleShot(16, self._render_pan_frame)
+        self._render_pending = True
+        QTimer.singleShot(16, self._render_scheduled_frame)
 
-    def _render_pan_frame(self):
-        self._pan_render_pending = False
+    def _render_scheduled_frame(self):
+        self._render_pending = False
         self.plotter.render()
 
     def _display_delta_to_world(self, delta):
@@ -210,15 +211,43 @@ class SceneViewer(QWidget):
         if hasattr(payload, "point_data") and "__colourmap_rgba" in payload.point_data:
             del payload.point_data["__colourmap_rgba"]
         if colourmap is not None and hasattr(payload, "points"):
-            points = np.asarray(payload.points)
+            scope = getattr(block_object, "colourmap_scope", "local")
+            reference = payload
+            if scope == "local":
+                reference = getattr(block_object, "colourmap_reference_data", payload)
+                if reference is None:
+                    reference = payload
+                elif (
+                    reference is not payload
+                    and hasattr(reference, "compute_normals")
+                    and "Normals" not in reference.point_data
+                ):
+                    reference = reference.compute_normals(
+                        auto_orient_normals=True,
+                        split_vertices=False,
+                        inplace=False,
+                    )
+            points = np.asarray(reference.points)
             elevation = points[:, 2]
-            elevation_span = float(elevation.max() - elevation.min()) if len(elevation) else 0.0
+            elevation_min = float(elevation.min()) if len(elevation) else 0.0
+            elevation_max = float(elevation.max()) if len(elevation) else 0.0
+            if scope == "global":
+                for scene_object in self.scene_model.objects:
+                    scene_block = getattr(scene_object, "block_object", None)
+                    scene_data = getattr(scene_block, "scene_data", None)
+                    if scene_data is None or scene_data is payload:
+                        continue
+                    if hasattr(scene_data, "points") and len(scene_data.points):
+                        scene_elevation = np.asarray(scene_data.points)[:, 2]
+                        elevation_min = min(elevation_min, float(scene_elevation.min()))
+                        elevation_max = max(elevation_max, float(scene_elevation.max()))
+            elevation_span = elevation_max - elevation_min
             relative_elevation = (
                 np.zeros_like(elevation)
                 if elevation_span <= 1e-12
-                else (elevation - elevation.min()) / elevation_span
+                else (elevation - elevation_min) / elevation_span
             )
-            normals = np.asarray(payload.point_data.get("Normals", np.zeros_like(points)))
+            normals = np.asarray(reference.point_data.get("Normals", np.zeros_like(points)))
             normal_z = np.clip((1.0 - normals[:, 2]) * 0.5, 0.0, 1.0)
             field_sources = getattr(
                 block_object, "colourmap_field_sources", ("elevation", "normal_z")
@@ -244,6 +273,8 @@ class SceneViewer(QWidget):
             payload.point_data["__colourmap_rgba"] = colour_scalars
 
         name = getattr(object_base, "name", None)
+        if name is not None:
+            name = f"{name}-{getattr(object_base, 'guid', id(object_base))}"
         if hasattr(payload, "GetMapper"):
             actor = self.plotter.add_actor(payload, reset_camera=False)
         else:
@@ -300,6 +331,14 @@ class SceneViewer(QWidget):
         self.plotter.render()
         return True
 
+    def set_shape_visibility(self, object_base, shape, visible):
+        actor = self._shape_actors.get((object_base, id(shape)))
+        if actor is None:
+            return False
+        actor.SetVisibility(bool(visible))
+        self.plotter.render()
+        return True
+
     def remove_object_shapes(self, object_base):
         for key, actor in tuple(self._shape_actors.items()):
             if key[0] is object_base:
@@ -343,7 +382,7 @@ class SceneViewer(QWidget):
         from components.timer import as_vtk_matrix
 
         actor.SetUserMatrix(as_vtk_matrix(transform))
-        self.plotter.render()
+        self._schedule_render()
         return True
 
     def clear_scene(self):

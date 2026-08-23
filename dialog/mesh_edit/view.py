@@ -3,13 +3,13 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
-    QLineEdit,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
 )
 
 from tools.widgets.vector import Vector3Widget
+from tools.widgets import NameField
 from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
 
 from .model import MeshEditModel
@@ -18,7 +18,7 @@ from .model import MeshEditModel
 class MeshEditView(QDialog):
     """Dialog for editing metadata and transforms on an existing mesh."""
 
-    def __init__(self, model: MeshEditModel, colourmaps=(), parent=None):
+    def __init__(self, model: MeshEditModel, colourmaps=(), parent=None, deduper=None):
         super().__init__(parent)
         self.model = model
         self.setWindowTitle("Edit Mesh")
@@ -28,7 +28,7 @@ class MeshEditView(QDialog):
         self.set_model(model)
 
     def _build_ui(self):
-        self.name = QLineEdit()
+        self.name = NameField(model.name, deduper)
         self.comments = QTextEdit()
         self.colourmap = QPushButton("Configure Colourmap...")
         self.colourmap.clicked.connect(self._configure_colourmap)

@@ -136,3 +136,6 @@ class MeshObject(ObjectBase):
         return self.mesh_block_object.set_colourmap_data_options(
             invert_field1, invert_field2
         )
+
+    def set_colourmap_scope(self, scope):
+        return self.mesh_block_object.set_colourmap_scope(scope)

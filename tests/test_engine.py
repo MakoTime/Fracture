@@ -8,6 +8,7 @@ from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from engine.block_tasks import GeneratedMeshTask, MeshFilterTask
 from engine.block_objects import (
     ColourmapBlockObject,
+    GeneratedMeshBlockObject,
     IslandBlockObject,
     MeshBlockObject,
     WorldConfigBlockObject,
@@ -103,7 +104,7 @@ def test_island_uses_core_offset_and_orientation_to_derive_position():
     assert np.linalg.norm(np.asarray(island.mesh_data.center) - world_config.centre) == 5.0
 
     world_config.update_configuration(centre=(0.0, 0.0, 0.0))
-    assert island.is_valid()
+    assert not island.is_valid()
 
 
 def test_island_exposes_source_mesh_colourmap_for_scene_rendering():
@@ -119,6 +120,60 @@ def test_island_exposes_source_mesh_colourmap_for_scene_rendering():
     assert island.colourmap is colourmap
     assert island.colourmap_field_sources == ("normal_z", "elevation")
     assert island.colourmap_field_inversions == (True, False)
+
+
+def test_perlin_changes_invalidate_generated_mesh_and_dependent_island():
+    transform = PerlinNoiseTransformBlockObject()
+    source = GeneratedMeshBlockObject(
+        mesh_data=pv.Plane(),
+        perlin_noise_transform=transform,
+    )
+    island = IslandBlockObject(mesh_block=source)
+    source.validate()
+    island.validate()
+    transform.validate()
+
+    transform.mark_changed()
+
+    assert not transform.is_valid()
+    assert not source.is_valid()
+    assert not island.is_valid()
+
+
+def test_colourmap_perlin_changes_invalidate_dependent_island():
+    transform = PerlinNoiseTransformBlockObject()
+    colourmap = ColourmapBlockObject(perlin_noise_transform=transform)
+    source = MeshBlockObject(
+        mesh_data=pv.Plane(),
+        colourmap=colourmap,
+    )
+    island = IslandBlockObject(mesh_block=source)
+    source.validate()
+    island.validate()
+    transform.validate()
+    colourmap.validate()
+
+    transform.mark_changed()
+
+    assert not source.is_valid()
+    assert not island.is_valid()
+
+
+def test_invalidation_reaches_parents_through_change_only_relationships():
+    transform = PerlinNoiseTransformBlockObject()
+    source = GeneratedMeshBlockObject(
+        mesh_data=pv.Plane(),
+        perlin_noise_transform=transform,
+    )
+    island = IslandBlockObject(mesh_block=source)
+    source.validate()
+    island.validate()
+    transform.validate()
+
+    transform.invalidate(force=True)
+
+    assert not source.is_valid()
+    assert not island.is_valid()
 
 
 def test_island_radius_uses_orbit_normal_and_angle():
@@ -138,6 +193,101 @@ def test_island_radius_uses_orbit_normal_and_angle():
         )
         result = IslandTask(island).process(island.prepare())
         assert np.allclose(result.center, expected)
+
+
+def test_curved_island_mesh_follows_arc_at_core_radius():
+    radius = 5.0
+    source = pv.PolyData(
+        np.array(
+            [
+                (-np.pi * radius / 2, 0.0, 0.0),
+                (0.0, 0.0, 0.0),
+                (np.pi * radius / 2, 0.0, 0.0),
+            ]
+        )
+    )
+
+    result = build_island_mesh(
+        {
+            "mesh_data": source,
+            "centre": (0.0, 0.0, 0.0),
+            "core_offset": radius,
+            "orbit_normal": (0.0, 0.0, 1.0),
+            "orbit_angle": 0.0,
+            "curve_mesh": True,
+        }
+    )
+
+    assert np.allclose(
+        result.points,
+        np.array(
+            [
+                (0.0, -radius, 0.0),
+                (radius, 0.0, 0.0),
+                (0.0, radius, 0.0),
+            ]
+        ),
+    )
+
+
+def test_curved_island_mesh_bends_both_surface_axes():
+    radius = 5.0
+    quarter_arc = np.pi * radius / 2
+    source = pv.PolyData(
+        np.array(
+            [
+                (-quarter_arc, 0.0, 0.0),
+                (0.0, -quarter_arc, 0.0),
+                (0.0, 0.0, 0.0),
+                (0.0, quarter_arc, 0.0),
+                (quarter_arc, 0.0, 0.0),
+            ]
+        )
+    )
+
+    result = build_island_mesh(
+        {
+            "mesh_data": source,
+            "centre": (0.0, 0.0, 0.0),
+            "core_offset": radius,
+            "orbit_normal": (0.0, 0.0, 1.0),
+            "orbit_angle": 0.0,
+            "curve_mesh": True,
+        }
+    )
+
+    assert np.allclose(
+        result.points,
+        np.array(
+            [
+                (0.0, -radius, 0.0),
+                (0.0, 0.0, -radius),
+                (radius, 0.0, 0.0),
+                (0.0, 0.0, radius),
+                (0.0, radius, 0.0),
+            ]
+        ),
+    )
+
+
+def test_curve_mesh_does_not_bend_at_zero_core_radius():
+    source = pv.PolyData(np.array([(-1.0, 0.0, 0.0), (1.0, 0.0, 0.0)]))
+
+    prepared = {
+        "mesh_data": source,
+        "centre": (0.0, 0.0, 0.0),
+        "core_offset": 0.0,
+        "orbit_normal": (0.0, 0.0, 1.0),
+    }
+    result = build_island_mesh(
+        {
+            **prepared,
+            "curve_mesh": True,
+        }
+    )
+    uncurved = build_island_mesh(prepared)
+
+    assert np.allclose(result.points, uncurved.points)
 
 
 def test_island_orbit_speed_advances_angle_without_changing_radius():

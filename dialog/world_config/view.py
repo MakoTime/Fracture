@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import QFormLayout, QLineEdit, QVBoxLayout
+from PySide6.QtWidgets import QFormLayout, QVBoxLayout
 
 from dialog.base.popup_editor import PopupEditorView
 from tools.widgets.vector import Vector3Widget
+from tools.widgets import NameField
 
 from .model import WorldConfigModel
 
@@ -9,12 +10,12 @@ from .model import WorldConfigModel
 class WorldConfigView(PopupEditorView):
     """Popup editor for the singleton world configuration."""
 
-    def __init__(self, model: WorldConfigModel, parent=None):
-        super().__init__(model, parent=parent)
+    def __init__(self, model: WorldConfigModel, parent=None, deduper=None):
+        super().__init__(model, parent=parent, deduper=deduper)
         self.setWindowTitle("Edit World Config")
         self.resize(340, 150)
 
-        self.name_field = QLineEdit()
+        self.name_field = NameField(model.name, deduper)
         self.name_field.setAccessibleName("World configuration name")
         self.centre_field = Vector3Widget()
         self.centre_field.setAccessibleName("World centre")

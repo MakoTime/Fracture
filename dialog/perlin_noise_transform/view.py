@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from tools.widgets import BezierCurveGraph
+from tools.widgets import BezierCurveGraph, NameField
 from .model import PerlinNoiseTransformModel
 from tools.widgets import DynamicSpinbox
 from dialog.base.popup_editor import PopupEditorView
@@ -26,7 +26,7 @@ class PerlinNoiseTransformView(PopupEditorView):
 
     PRESETS = ("Manual", "Impulse", "Flat bar", "Sin wave", "Cos wave", "Normal distribution")
 
-    def __init__(self, model=None, parent=None):
+    def __init__(self, model=None, parent=None, deduper=None):
         PopupEditorView.__init__(
             self,
             model or PerlinNoiseTransformModel(),
@@ -35,7 +35,7 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.setWindowTitle("Perlin Noise Transform")
         self.resize(820, 430)
 
-        self.name_field = QLineEdit(self.model.name)
+        self.name_field = NameField(self.model.name, deduper)
         curve_range = self.model.curve_mode == "bezier"
         frequency_minimum = (
             min(self.model.frequencies)
@@ -381,7 +381,7 @@ class PerlinNoiseTransformView(PopupEditorView):
                 amplitudes = tuple(self.graph.amplitudes)
             amplitudes = tuple(value * self.max_amplitude_field.value() for value in amplitudes)
             self.model = PerlinNoiseTransformModel(
-                name=self.name_field.text(),
+                name=self.name_field.unique_name(),
                 frequencies=frequencies,
                 amplitudes=amplitudes,
                 seed=self.seed_field.value(),

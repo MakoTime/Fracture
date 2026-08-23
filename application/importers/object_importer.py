@@ -42,6 +42,7 @@ class ObjectImporterModel:
             object_base._importer_destruction_callback = remove_table_row
             block.add_destruction_callback(remove_table_row)
         object_base.add_to_tree(self.tree_manager, parent=parent)
+        self.sync_block_child_nodes()
         self.shape_controller.attach(object_base)
         self.timer_controller.attach(object_base)
         if not add_to_scene:
@@ -53,6 +54,28 @@ class ObjectImporterModel:
             parent=parent,
         )
         return object_base
+
+    def sync_block_child_nodes(self):
+        """Show registered block relationships as aliases beneath each object."""
+        if not hasattr(self.tree_manager, "get_root_nodes"):
+            return
+        objects = TreeSearch(self.tree_manager.get_root_nodes()).find()
+        by_block = {
+            getattr(object_base, "block_object", None): object_base
+            for object_base in objects
+            if getattr(object_base, "block_object", None) is not None
+        }
+        for object_base in objects:
+            node = getattr(object_base, "node", None)
+            block = getattr(object_base, "block_object", None)
+            if node is None or block is None:
+                continue
+            children = tuple(
+                by_block[child]
+                for child in block.relationship_child_block_objects
+                if child in by_block and by_block[child] is not object_base
+            )
+            node.set_block_child_objects(children)
 
     def remove(self, object_base: ObjectBase):
         """Remove an object from the table, scene, and tree."""

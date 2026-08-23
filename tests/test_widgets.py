@@ -267,7 +267,7 @@ def test_object_block_change_refreshes_table_and_scene_views(qapp):
 
 def test_mesh_import_destination_checkbox_updates_model(qapp):
     model = MeshImportModel()
-    view = MeshImportView(model)
+    view = MeshImportView(model, deduper=lambda name: name)
 
     assert model.add_to_scene is False
     assert view.add_to_scene.isChecked() is False
