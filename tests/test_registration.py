@@ -40,6 +40,7 @@ from dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from dialog.mesh_filter import MeshFilterModel
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from objects.object_base import ObjectBase
+from tests.viewable_test_object import ViewableTestObject
 from components.scene import ShapeController
 from components.table import TableManager, TableModel, TableView
 
@@ -97,6 +98,7 @@ def test_mesh_root_menu_separates_import_types(qapp):
 
     assert [action.text() for action in menu.actions()] == [
         "Generate Mesh",
+        "Generate Procedural Mesh",
         "Import mesh from 3D object",
         "Import Mesh from elevation data",
     ]
@@ -946,7 +948,7 @@ def test_tree_and_table_read_mesh_identity_from_block(qapp):
 
 def test_object_base_registers_table_data(qapp):
     table_manager = TableManager()
-    object_base = ObjectBase("Table Object")
+    object_base = ViewableTestObject("Table Object")
 
     object_base.add_to_table(table_manager)
 
@@ -957,7 +959,7 @@ def test_object_base_registers_table_data(qapp):
 def test_table_model_exposes_rows_added_after_view_creation(qapp):
     table_manager = TableManager()
     table_model = TableModel(table_manager)
-    object_base = ObjectBase("Live Row")
+    object_base = ViewableTestObject("Live Row")
 
     table_model.add_row(object_base.row_data)
 
@@ -981,7 +983,7 @@ def test_table_visibility_controls_scene_actor(qapp):
 
     table_manager = TableManager()
     table_model = TableModel(table_manager)
-    object_base = ObjectBase("Visible Row")
+    object_base = ViewableTestObject("Visible Row")
     scene = FakeScene()
     object_base.add_to_scene(scene)
     table_model.add_row(object_base.row_data)
@@ -1019,7 +1021,7 @@ def test_shape_controller_attaches_table_interface_and_owns_shapes():
         def refresh_object(self, object_base):
             self.refreshed.append(object_base)
 
-    object_base = ObjectBase("Shape owner")
+    object_base = ViewableTestObject("Shape owner")
     scene = FakeScene()
     table = FakeTable()
     table_model = TableModel(TableManager())
@@ -1156,7 +1158,7 @@ def test_table_remove_unloads_object_but_keeps_tree_node(qapp):
 
     table_manager = TableManager()
     table_model = TableModel(table_manager)
-    object_base = ObjectBase("Removable")
+    object_base = ViewableTestObject("Removable")
     scene = FakeScene()
     object_base.add_to_scene(scene)
     object_base.add_to_table(table_manager)

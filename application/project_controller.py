@@ -60,6 +60,7 @@ class ProjectController:
             table_model=self.table_model,
             tree_manager=self.tree_manager,
             scene_viewer=self.window.scene_viewer,
+            tree_model=self.tree_model,
         )
         self.window.worldStateView.timer_controller = (
             self.object_importer.timer_controller

@@ -3,6 +3,7 @@ from PySide6.QtCore import QDate, QDateTime, QTime
 from tools.widgets import (
     FastForwardWidget,
     MediaControlsWidget,
+    NormalizedSpinBox,
     PlayPauseWidget,
     RewindWidget,
     VisibleWidget,
@@ -11,9 +12,9 @@ from components.table import TableManager, TableView
 from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_import.view import MeshImportView
 from components.world_state import WorldStateView
-from dialog.mesh_generate.view import NormalizedSpinBox
 from tools.widgets import DynamicSpinbox
 from objects.object_base import ObjectBase
+from tests.viewable_test_object import ViewableTestObject
 from objects.mesh_object import MeshObject
 
 
@@ -212,7 +213,7 @@ def test_visible_widget_switches_icon_state_and_highlights(qapp):
 
 def test_table_view_uses_visible_widget_for_visible_column(qapp):
     table_view = TableView()
-    object_base = ObjectBase("Table Visibility", visible=False)
+    object_base = ViewableTestObject("Table Visibility", visible=False)
     table_view.table_model.add_row(object_base.row_data)
 
     index = table_view.table_model.index(0, table_view.table_model.VISIBLE)
@@ -228,7 +229,7 @@ def test_table_view_uses_visible_widget_for_visible_column(qapp):
 
 def test_table_model_refresh_object_notifies_registered_row(qapp):
     table_view = TableView()
-    object_base = ObjectBase("Refreshable")
+    object_base = ViewableTestObject("Refreshable")
     table_view.table_model.add_row(object_base.row_data)
     changed = []
     table_view.table_model.dataChanged.connect(

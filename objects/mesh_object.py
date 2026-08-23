@@ -4,13 +4,13 @@ from PySide6.QtGui import QIcon
 
 from common.icons import get_icon
 from engine.block_objects import MeshBlockObject
-from .object_base import ObjectBase
+from .object_base import ObjectBase, ViewableMixin
 
 
 Vector3 = tuple[float, float, float]
 
 
-class MeshObject(ObjectBase):
+class MeshObject(ViewableMixin, ObjectBase):
     """Application object representing an imported mesh dataset."""
 
     def __init__(
@@ -41,7 +41,6 @@ class MeshObject(ObjectBase):
             name=name,
             icon=icon if icon is not None else get_icon("shape_cube"),
             visible=visible,
-            scene_data=None,
             metadata={
                 "guid": self.mesh_block_object.guid,
                 "comments": self.mesh_block_object.comments,

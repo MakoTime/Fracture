@@ -1,4 +1,4 @@
-from .vector import Vector2Widget, Vector3Widget
+from .vector import Vector2Widget, Vector3Widget, IntegerVector3Widget
 from .dynamic_spinbox import DynamicSpinbox
 from .media_controls import MediaControlsWidget
 from .play_pause import PlayPauseWidget
@@ -6,6 +6,7 @@ from .transport import FastForwardWidget, RewindWidget
 from .visible import VisibleWidget
 from .bezier_graph import BezierCurveGraph
 from .name import NameField
+from .spin_boxes import CompactSpinBox, NormalizedSpinBox
 
 __all__ = [
 	"FastForwardWidget",
@@ -15,7 +16,10 @@ __all__ = [
 	"RewindWidget",
 	"Vector2Widget",
 	"Vector3Widget",
+	"IntegerVector3Widget",
 	"VisibleWidget",
 	"BezierCurveGraph",
 	"NameField",
+	"CompactSpinBox",
+	"NormalizedSpinBox",
 ]

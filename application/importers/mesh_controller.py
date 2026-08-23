@@ -14,14 +14,22 @@ from dialog.mesh_import.factory import (
     create_elevation_import_dialog,
     create_mesh_import_dialog,
 )
+from dialog.mesh_procedural.factory import create_mesh_procedural_dialog
+from dialog.mesh_procedural.model import MeshProceduralModel
 from dialog.notify import create_notification
 from engine import EngineTask
-from engine.block_objects import MeshBlockObject, PerlinNoiseTransformBlockObject
+from engine.block_objects import (
+    MeshBlockObject,
+    PerlinNoiseTransformBlockObject,
+    ProceduralMeshBlock,
+)
 from objects.colourmap import ColourmapObject
 from engine.block_tasks import GeneratedMeshTask, MeshFilterTask, MeshImportTask
 from engine.block_tasks import PerlinNoiseTransformTask
+from engine.block_tasks import ProceduralMeshObjectTask
 from objects.mesh_object import MeshObject
 from objects.generated_mesh import GeneratedMesh
+from objects.procedural_mesh import ProceduralMeshObject
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from tools.dropdown import create_dropdown_menu
 from common.icons import get_icon
@@ -46,6 +54,7 @@ class MeshImportController:
         self.parent = parent
         self.engine_runner = engine_runner
         self.generate_mesh_window = None
+        self.generate_procedural_mesh_window = None
         if hasattr(self.tree_view, "add_context_menu_factory"):
             self.tree_view.add_context_menu_factory(
                 self._create_context_menu_for_index
@@ -146,6 +155,71 @@ class MeshImportController:
             workspace_tabs.setCurrentWidget(window)
         return window
 
+    def generate_procedural_mesh(self):
+        """Open the Perlin-noise procedural mesh workspace."""
+        transforms = tuple(
+            node.node_object
+            for node in transform_root.children
+            if isinstance(node.node_object, PerlinNoiseTransformObject)
+        )
+        if self.generate_procedural_mesh_window is None:
+            self.generate_procedural_mesh_window = create_mesh_procedural_dialog(
+                on_apply=self._register_procedural_mesh,
+                parent=self.parent,
+                tree_search=TreeSearch(root_objects.get_nodes()),
+                deduper=self._deduper(),
+                transforms=transforms,
+            )
+            workspace_tabs = (
+                self.parent.findChild(QTabWidget, "workspaceTabs")
+                if self.parent is not None
+                else None
+            )
+            if workspace_tabs is None:
+                self.generate_procedural_mesh_window.show()
+                return self.generate_procedural_mesh_window
+            workspace_tabs.addTab(
+                self.generate_procedural_mesh_window,
+                "Generate Procedural Mesh",
+            )
+            workspace_tabs.setCurrentWidget(self.generate_procedural_mesh_window)
+        elif not self.generate_procedural_mesh_window.isVisible():
+            workspace_tabs = (
+                self.parent.findChild(QTabWidget, "workspaceTabs")
+                if self.parent is not None
+                else None
+            )
+            if workspace_tabs is not None and workspace_tabs.indexOf(
+                self.generate_procedural_mesh_window
+            ) < 0:
+                workspace_tabs.addTab(
+                    self.generate_procedural_mesh_window,
+                    "Generate Procedural Mesh",
+                )
+                workspace_tabs.setCurrentWidget(
+                    self.generate_procedural_mesh_window
+                )
+            else:
+                self.generate_procedural_mesh_window.show()
+        return self.generate_procedural_mesh_window
+
+    def _register_procedural_mesh(self, mesh_object):
+        """Persist and register a procedural mesh after generation."""
+        if self.object_importer is None or not hasattr(
+            self.object_importer, "register"
+        ):
+            return mesh_object
+        mesh_object.set_visible(True)
+        self.object_importer.persist_block(mesh_object.mesh_block_object)
+        self.object_importer.register(
+            mesh_object,
+            parent=mesh_root,
+        )
+        self._sync_mesh_children(mesh_object)
+        self._bind_procedural_mesh_tasks(mesh_object)
+        self._show_mesh(mesh_object)
+        return mesh_object
+
     def filter_mesh(self, mesh_object: GeneratedMesh):
         """Open the mesh filter workspace for an existing generated mesh."""
         transforms = tuple(
@@ -244,11 +318,11 @@ class MeshImportController:
             self.object_importer, "register"
         ):
             return mesh_object
+        mesh_object.set_visible(True)
         self.object_importer.persist_block(mesh_object.mesh_block_object)
         self.object_importer.register(
             mesh_object,
             parent=mesh_root,
-            add_to_scene=False,
         )
         self._sync_generated_mesh_children(mesh_object)
         self._bind_generated_mesh_tasks(mesh_object)
@@ -291,6 +365,26 @@ class MeshImportController:
                 parent_task,
             )
 
+    def _bind_procedural_mesh_tasks(self, mesh_object):
+        if self.engine_runner is None or not hasattr(
+            self.engine_runner, "enqueue_block_task"
+        ):
+            return
+        block = mesh_object.mesh_block_object
+        child = block.perlin_noise_transform
+        if child is not None:
+            self.engine_runner.enqueue_block_task(
+                f"Configure {child.name}",
+                PerlinNoiseTransformTask(child),
+            )
+        model = MeshProceduralModel.from_procedural_mesh(mesh_object)
+        task = ProceduralMeshObjectTask(model, block)
+        self.engine_runner.enqueue_block_task(
+            f"Regenerate {mesh_object.name}",
+            task,
+            on_finished=lambda finished: self._finish_task(mesh_object, finished),
+        )
+
     def bind_loaded_tasks(self, loaded_objects):
         """Restore engine task bindings for meshes loaded from a project."""
         for mesh_object in loaded_objects:
@@ -298,6 +392,9 @@ class MeshImportController:
                 continue
             if isinstance(mesh_object, GeneratedMesh):
                 self._bind_generated_mesh_tasks(mesh_object)
+                continue
+            if isinstance(mesh_object, ProceduralMeshObject):
+                self._bind_procedural_mesh_tasks(mesh_object)
                 continue
             block = mesh_object.mesh_block_object
             parameters = getattr(block, "filter_parameters", None)
@@ -483,6 +580,7 @@ class MeshImportController:
         options = []
         if node is mesh_root:
             options.append(("Generate Mesh", self.generate_mesh))
+            options.append(("Generate Procedural Mesh", self.generate_procedural_mesh))
             options.append(("Import mesh from 3D object", self.import_mesh))
             options.append(("Import Mesh from elevation data", self.import_elevation))
         elif isinstance(node.node_object, MeshObject):

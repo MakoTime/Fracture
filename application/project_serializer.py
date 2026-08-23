@@ -17,11 +17,13 @@ from engine.block_objects import (
     IslandBlockObject,
     MeshBlockObject,
     PerlinNoiseTransformBlockObject,
+    ProceduralMeshBlock,
 )
 from objects.generated_mesh import GeneratedMesh
 from objects.colourmap import ColourmapObject
 from objects.mesh_object import MeshObject
 from objects.island import Island
+from objects.procedural_mesh import ProceduralMeshObject
 from application.project_version import CURRENT_PROJECT_VERSION, upgrade_project_data
 
 
@@ -54,7 +56,9 @@ class ProjectSerializer:
             if not in_scene:
                 block.release()
             item = {
-                "type": "generated_mesh"
+                "type": "procedural_mesh"
+                if isinstance(mesh_object, ProceduralMeshObject)
+                else "generated_mesh"
                 if isinstance(mesh_object, GeneratedMesh)
                 else "mesh",
                 "guid": block.guid,
@@ -74,12 +78,16 @@ class ProjectSerializer:
             }
             if hasattr(block, "filter_parameters"):
                 item["filter_parameters"] = dict(block.filter_parameters)
-            if isinstance(mesh_object, GeneratedMesh):
+            if isinstance(mesh_object, (GeneratedMesh, ProceduralMeshObject)):
                 grid_path = block.grid_serialised_path
                 item["grid_data"] = f"{BLOCK_DATA_DIRECTORY}/{grid_path.name}"
                 transform = block.perlin_noise_transform
                 item["transform_reference"] = (
                     transform.guid if transform is not None else None
+                )
+            if isinstance(mesh_object, ProceduralMeshObject):
+                item["procedural_settings"] = mesh_object.metadata.get(
+                    "procedural_settings", {}
                 )
             objects.append(item)
 
@@ -126,7 +134,6 @@ class ProjectSerializer:
                     "guid": colourmap.guid,
                     "name": colourmap.name,
                     "comments": colourmap.block_object.comments,
-                    "visible": colourmap.visible,
                     "parent_guid": self._parent_guid(node),
                     "child_references": self._child_references(
                         colourmap.block_object
@@ -250,7 +257,6 @@ class ProjectSerializer:
                         name=item["name"],
                         block_object=block,
                         comments=item.get("comments", ""),
-                        visible=item.get("visible", True),
                         guid=item["guid"],
                         auto_register_root=False,
                     )
@@ -297,11 +303,13 @@ class ProjectSerializer:
                     continue
                 block_path = project_path.parent / item["block_data"]
                 block_class = (
-                    GeneratedMeshBlockObject
+                    ProceduralMeshBlock
+                    if item.get("type") == "procedural_mesh"
+                    else GeneratedMeshBlockObject
                     if item.get("type") == "generated_mesh"
                     else MeshBlockObject
                 )
-                if item.get("type") == "generated_mesh":
+                if item.get("type") in ("generated_mesh", "procedural_mesh"):
                     block = block_class.load(
                         block_path,
                         grid_path=project_path.parent / item["grid_data"],
@@ -324,6 +332,9 @@ class ProjectSerializer:
                 if object_type == "generated_mesh":
                     grid_data = block.grid_data
                     object_class = GeneratedMesh
+                elif object_type == "procedural_mesh":
+                    grid_data = block.grid_data
+                    object_class = ProceduralMeshObject
                 else:
                     grid_data = None
                     object_class = MeshObject
@@ -337,9 +348,15 @@ class ProjectSerializer:
                 }
                 if object_class is GeneratedMesh:
                     object_kwargs["grid_data"] = grid_data
+                elif object_class is ProceduralMeshObject:
+                    object_kwargs["grid_data"] = grid_data
                 mesh_object = object_class(
                     **object_kwargs,
                 )
+                if object_type == "procedural_mesh":
+                    mesh_object.metadata["procedural_settings"] = item.get(
+                        "procedural_settings", {}
+                    )
                 sources = item.get(
                     "colourmap_field_sources", block.colourmap_field_sources
                 )
@@ -412,7 +429,7 @@ class ProjectSerializer:
                         f"{reference.get('guid')}"
                     )
                 if (
-                    isinstance(parent_block, GeneratedMeshBlockObject)
+                    isinstance(parent_block, (GeneratedMeshBlockObject, ProceduralMeshBlock))
                     and isinstance(child_block, PerlinNoiseTransformBlockObject)
                 ):
                     parent_block.set_perlin_noise_transform(child_block)
@@ -447,7 +464,7 @@ class ProjectSerializer:
             transform_guid = item.get("transform_reference")
             if transform_guid is not None and isinstance(
                 parent_block,
-                (GeneratedMeshBlockObject, ColourmapBlockObject),
+                (GeneratedMeshBlockObject, ProceduralMeshBlock, ColourmapBlockObject),
             ):
                 transform = loaded.get(transform_guid)
                 transform_block = getattr(transform, "block_object", None)

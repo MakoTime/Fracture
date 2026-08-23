@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from dialog.base.editor import EditorModel
 
@@ -13,8 +13,8 @@ class PerlinNoiseTransformModel(EditorModel):
     name: str = "Perlin Noise Transform"
     frequencies: tuple[int, ...] = (4,)
     amplitudes: tuple[float, ...] = (1.0,)
-    seed: int = 0
     guid: str = field(default_factory=lambda: str(uuid4()))
+    seed: int | None = None
     curve_mode: str = "bezier"
     curve_points: tuple[tuple[float, float], ...] = ()
     curve_handles: tuple = ()
@@ -28,6 +28,8 @@ class PerlinNoiseTransformModel(EditorModel):
     penetration: int = 1
 
     def __post_init__(self):
+        if self.seed is None:
+            self.seed = UUID(self.guid).int & 0x7FFFFFFF
         self.frequencies = tuple(int(value) for value in self.frequencies)
         self.amplitudes = tuple(float(value) for value in self.amplitudes)
         self.curve_points = tuple(

@@ -16,7 +16,6 @@ class TransformObject(ObjectBase):
         name: str,
         block_object: TransformBlockObject,
         comments: str = "",
-        visible: bool = True,
         icon: Optional[QIcon] = None,
         guid: Optional[str] = None,
         auto_register_root: bool = False,
@@ -27,7 +26,6 @@ class TransformObject(ObjectBase):
         self.transform_block_object.comments = comments
         super().__init__(
             name=name,
-            visible=visible,
             icon=icon if icon is not None else get_icon("photo_changed_filter"),
             guid=guid,
             auto_register_root=auto_register_root,

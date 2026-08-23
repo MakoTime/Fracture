@@ -26,7 +26,6 @@ class WorldConfig(ObjectBase):
         super().__init__(
             name=block.name,
             icon=icon if icon is not None else get_icon("earth"),
-            visible=True,
             guid=block.guid,
             auto_register_root=auto_register_root,
         )
@@ -52,5 +51,6 @@ class WorldConfig(ObjectBase):
     def update_configuration(self, *, name=None, centre=None):
         result = self.block_object.update_configuration(name=name, centre=centre)
         self.node.name = self.name
-        self.row_data.name = self.name
+        if hasattr(self, "row_data"):
+            self.row_data.name = self.name
         return result

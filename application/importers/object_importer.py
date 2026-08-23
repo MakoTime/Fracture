@@ -1,4 +1,4 @@
-from objects.object_base import ObjectBase
+from objects.object_base import ObjectBase, ViewableMixin
 from components.tree import TreeSearch
 from dialog.notify import create_notification
 
@@ -8,16 +8,22 @@ from .registry import ImportBindingRegistry
 class ObjectImporterModel:
     """Register domain objects with the active project targets."""
 
-    def __init__(self, table_model, tree_manager, scene_viewer):
+    def __init__(self, table_model, tree_manager, scene_viewer, tree_model=None):
         self.table_model = table_model
         self.tree_manager = tree_manager
         self.scene_viewer = scene_viewer
+        self.tree_model = tree_model
         self.block_data_directory = None
         from components.scene import ShapeController
         from components.timer import TimerController
 
         self.shape_controller = ShapeController(scene_viewer, table_model)
         self.timer_controller = TimerController(scene_viewer)
+
+    def _refresh_tree(self):
+        """Reset the tree view's model so stale node indexes are dropped."""
+        if self.tree_model is not None and hasattr(self.tree_model, "refresh"):
+            self.tree_model.refresh()
 
     def persist_block(self, block_object):
         """Persist a processed block when the active project has storage."""
@@ -41,18 +47,22 @@ class ObjectImporterModel:
 
             object_base._importer_destruction_callback = remove_table_row
             block.add_destruction_callback(remove_table_row)
-        object_base.add_to_tree(self.tree_manager, parent=parent)
+        if isinstance(object_base, ViewableMixin):
+            object_base.register(
+                tree_manager=self.tree_manager,
+                parent=parent,
+                table_manager=self.table_model if add_to_scene else None,
+                scene=self.scene_viewer if add_to_scene else None,
+            )
+        else:
+            object_base.register(self.tree_manager, parent=parent)
         self.sync_block_child_nodes()
         self.shape_controller.attach(object_base)
         self.timer_controller.attach(object_base)
         if not add_to_scene:
+            self._refresh_tree()
             return object_base
-        object_base.register(
-            table_manager=self.table_model,
-            tree_manager=self.tree_manager,
-            scene=self.scene_viewer,
-            parent=parent,
-        )
+        self._refresh_tree()
         return object_base
 
     def sync_block_child_nodes(self):
@@ -81,6 +91,7 @@ class ObjectImporterModel:
         """Remove an object from the table, scene, and tree."""
         self.table_model.remove_object(object_base)
         object_base.destroy()
+        self._refresh_tree()
         return object_base
 
     def refresh_object(self, object_base):

@@ -24,10 +24,15 @@ class SceneViewer(QWidget):
         self.plotter = QtInteractor(self)
         self._pan_anchor = None
         self._pan_active = False
+        self._left_press_position = None
+        self._left_dragged = False
         self._render_pending = False
+        self._picker = vtk.vtkPropPicker()
         self.plotter.interactor.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._configure_terrain_interaction()
         self.plotter.interactor.installEventFilter(self)
+        self.highlight_actor = None
+        self.silhouette = vtk.vtkPolyDataSilhouette()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -58,17 +63,26 @@ class SceneViewer(QWidget):
             return True
 
         if event.type() == QEvent.Type.MouseMove:
+            if self._left_press_position is not None and event.buttons() & Qt.MouseButton.LeftButton:
+                self._left_dragged = (
+                    event.position().toPoint() - self._left_press_position
+                ).manhattanLength() > 3
             if event.buttons() == (
                 Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
             ):
+                self._left_press_position = None
                 self._pan_camera(event.position().toPoint())
                 return True
             self._pan_anchor = None
 
         if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._left_press_position = event.position().toPoint()
+                self._left_dragged = False
             if event.buttons() == (
                 Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
             ):
+                self._left_press_position = None
                 self._pan_active = True
                 self._pan_anchor = event.position().toPoint()
                 self._end_terrain_gesture()
@@ -80,13 +94,64 @@ class SceneViewer(QWidget):
             self._end_terrain_gesture()
             self._reset_clipping_range()
             self.plotter.render()
+            self.update_silhouette()
             return True
 
         if event.type() == QEvent.Type.MouseButtonRelease:
+            if event.button() == Qt.MouseButton.LeftButton:
+                if not self._left_dragged and self._left_press_position is not None:
+                    self._select_at(event.position().toPoint())
+                self._left_press_position = None
+                self._left_dragged = False
             self._end_terrain_gesture()
             self._reset_clipping_range()
             self.plotter.render()
         return super().eventFilter(watched, event)
+
+    def _select_at(self, position):
+        """Notify the scene object whose actor is beneath a display position."""
+        if self.highlight_actor is not None:
+            self.plotter.remove_actor(self.highlight_actor)
+            self.highlight_actor = None
+        self._picker.Pick(
+            position.x(),
+            self.plotter.interactor.height() - position.y(),
+            0,
+            self.plotter.renderer,
+        )
+        actor = self._picker.GetActor()
+        if actor is None:
+            return None
+        for object_base, scene_actor in self._actors.items():
+            if scene_actor is actor:
+                self.highlight(object_base)
+                return object_base
+        return None
+    
+    def highlight(self, object_base):
+        """Highlight an object in the scene with a silhouette."""
+        if self.highlight_actor is not None:
+            self.plotter.remove_actor(self.highlight_actor)
+            
+        actor = self._actors.get(object_base)
+        if actor is None:
+            self.highlight_actor = None
+            return False
+        
+        vtk_mesh = actor.GetMapper().GetInput()
+        mesh = pv.wrap(vtk_mesh)
+        self.silhouette.SetInputData(mesh)
+        self.update_silhouette()
+
+        silhouette_mesh = pv.wrap(self.silhouette.GetOutput())
+        self.highlight_actor = self.plotter.add_mesh(silhouette_mesh)
+        self.highlight_actor.SetUserMatrix(actor.GetMatrix())
+        return True
+    
+    def update_silhouette(self):
+        """Update the silhouette of the highlighted object."""
+        self.silhouette.SetCamera(self.plotter.camera)
+        self.silhouette.Update()
 
     def _end_terrain_gesture(self):
         self._terrain_style.EndRotate()
@@ -384,7 +449,7 @@ class SceneViewer(QWidget):
         actor.SetUserMatrix(as_vtk_matrix(transform))
         self._schedule_render()
         return True
-
+    
     def clear_scene(self):
         self.plotter.clear()
         if self._show_sky_dome:

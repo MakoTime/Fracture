@@ -6,6 +6,7 @@ from .perlin_noise import PerlinNoiseTransformBlockObject
 from .transform import TransformBlockObject
 from .world_config import WorldConfigBlockObject
 from .island import IslandBlockObject
+from .procedural_mesh import ProceduralMeshBlock, ProceduralMeshBlockObject
 
 __all__ = [
 	"BlockObject",
@@ -16,4 +17,6 @@ __all__ = [
 	"TransformBlockObject",
 	"WorldConfigBlockObject",
 	"IslandBlockObject",
+	"ProceduralMeshBlock",
+	"ProceduralMeshBlockObject",
 ]

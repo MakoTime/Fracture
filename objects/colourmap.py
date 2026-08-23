@@ -17,7 +17,6 @@ class ColourmapObject(ObjectBase):
         name: str = "Colourmap",
         block_object: Optional[ColourmapBlockObject] = None,
         comments: str = "",
-        visible: bool = True,
         icon: Optional[QIcon] = None,
         guid: Optional[str] = None,
         auto_register_root: bool = False,
@@ -31,7 +30,6 @@ class ColourmapObject(ObjectBase):
         super().__init__(
             name=name,
             icon=icon if icon is not None else get_icon("colour_palette"),
-            visible=visible,
             guid=guid,
             auto_register_root=auto_register_root,
         )

@@ -6,10 +6,10 @@ from PySide6.QtGui import QIcon
 from common.icons import get_icon
 from engine.block_objects import IslandBlockObject
 
-from .object_base import ObjectBase
+from .object_base import ObjectBase, ViewableMixin
 
 
-class Island(ObjectBase):
+class Island(ViewableMixin, ObjectBase):
     """Scene object representing a positioned source mesh island."""
 
     def __init__(

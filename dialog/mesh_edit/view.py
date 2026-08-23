@@ -1,6 +1,4 @@
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QGroupBox,
     QPushButton,
@@ -11,16 +9,17 @@ from PySide6.QtWidgets import (
 from tools.widgets.vector import Vector3Widget
 from tools.widgets import NameField
 from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
+from dialog.base.popup_editor import PopupEditorView
 
 from .model import MeshEditModel
 
 
-class MeshEditView(QDialog):
+class MeshEditView(PopupEditorView):
     """Dialog for editing metadata and transforms on an existing mesh."""
 
     def __init__(self, model: MeshEditModel, colourmaps=(), parent=None, deduper=None):
-        super().__init__(parent)
-        self.model = model
+        super().__init__(model, parent=parent)
+        self.deduper = deduper or (lambda name: name)
         self.setWindowTitle("Edit Mesh")
         self.resize(520, 420)
         self._build_ui()
@@ -28,7 +27,7 @@ class MeshEditView(QDialog):
         self.set_model(model)
 
     def _build_ui(self):
-        self.name = NameField(model.name, deduper)
+        self.name = NameField(self.model.name, self.deduper)
         self.comments = QTextEdit()
         self.colourmap = QPushButton("Configure Colourmap...")
         self.colourmap.clicked.connect(self._configure_colourmap)
@@ -54,12 +53,7 @@ class MeshEditView(QDialog):
         transform_group = QGroupBox("Transform")
         transform_group.setLayout(transforms)
 
-        self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        self.button_box.accepted.connect(self._accept)
-        self.button_box.rejected.connect(self.reject)
+        self.create_button_box()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 16)
@@ -124,6 +118,3 @@ class MeshEditView(QDialog):
         name = getattr(self.model.colourmap, "name", "None")
         self.colourmap.setText(f"Colourmap: {name}")
 
-    def _accept(self):
-        self.update_model()
-        self.accept()
