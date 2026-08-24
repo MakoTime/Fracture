@@ -1,8 +1,11 @@
+import sys
 from pathlib import Path
 
 from PySide6.QtGui import QIcon
+from src.common.resources import resource_path
 
-ICON_DIRECTORY = Path(__file__).resolve().parent.parent / "icons"
+
+ICON_DIRECTORY = resource_path("icons")
 
 
 def _icon(filename: str) -> QIcon:

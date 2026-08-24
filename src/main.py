@@ -20,6 +20,8 @@ from src.components.world_state import WorldStateView
 from src.dialog.notify import create_notification
 from src.engine import EngineRunner
 
+from src.common.resources import resource_path
+
 
 def load_main_window(project_file, menu_bar=None):
     """Load the Designer UI and connect its application models and views."""
@@ -29,7 +31,7 @@ def load_main_window(project_file, menu_bar=None):
     loader.registerCustomWidget(TableView)
     loader.registerCustomWidget(EngineRunner)
     loader.registerCustomWidget(WorldStateView)
-    ui_path = Path(__file__).parent / "UI" / "main.ui"
+    ui_path = resource_path("UI/main.ui")
     window = loader.load(str(ui_path))
     if window is None:
         raise RuntimeError(loader.errorString())
@@ -48,7 +50,7 @@ def load_file_window(store=None):
     """Load the startup project-selection window from Designer UI."""
     loader = QUiLoader()
     loader.registerCustomWidget(ProjectPreview)
-    ui_path = Path(__file__).parent / "UI" / "file_window.ui"
+    ui_path = resource_path("UI/file_window.ui")
     window = loader.load(str(ui_path))
     if window is None:
         raise RuntimeError(loader.errorString())
