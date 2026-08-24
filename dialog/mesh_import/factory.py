@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import MeshImportModel
@@ -7,8 +5,8 @@ from .view import ElevationImportView, MeshImportView
 
 
 def create_mesh_import_dialog(
-    model: Optional[MeshImportModel] = None,
-    parent: Optional[QWidget] = None,
+    model: MeshImportModel | None = None,
+    parent: QWidget | None = None,
     deduper=None,
 ) -> MeshImportView:
     """Build a mesh import dialog from optional initial data."""
@@ -17,10 +15,12 @@ def create_mesh_import_dialog(
 
 
 def create_elevation_import_dialog(
-    model: Optional[MeshImportModel] = None,
-    parent: Optional[QWidget] = None,
+    model: MeshImportModel | None = None,
+    parent: QWidget | None = None,
     deduper=None,
 ) -> ElevationImportView:
     """Build a dialog for importing image elevation data."""
     deduper = deduper or (lambda name: name)
-    return ElevationImportView(model or MeshImportModel(), parent=parent, deduper=deduper)
+    return ElevationImportView(
+        model or MeshImportModel(), parent=parent, deduper=deduper
+    )

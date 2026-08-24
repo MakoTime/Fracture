@@ -3,9 +3,9 @@ from typing import Any
 import numpy as np
 import pyvista as pv
 import vtk
-from pyvistaqt import QtInteractor
-from PySide6.QtCore import QEvent, QTimer, Qt
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import QVBoxLayout, QWidget
+from pyvistaqt import QtInteractor
 
 from .model import SceneModel
 from .sky_dome import SkyDome
@@ -63,7 +63,10 @@ class SceneViewer(QWidget):
             return True
 
         if event.type() == QEvent.Type.MouseMove:
-            if self._left_press_position is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            if (
+                self._left_press_position is not None
+                and event.buttons() & Qt.MouseButton.LeftButton
+            ):
                 self._left_dragged = (
                     event.position().toPoint() - self._left_press_position
                 ).manhattanLength() > 3
@@ -127,17 +130,17 @@ class SceneViewer(QWidget):
                 self.highlight(object_base)
                 return object_base
         return None
-    
+
     def highlight(self, object_base):
         """Highlight an object in the scene with a silhouette."""
         if self.highlight_actor is not None:
             self.plotter.remove_actor(self.highlight_actor)
-            
+
         actor = self._actors.get(object_base)
         if actor is None:
             self.highlight_actor = None
             return False
-        
+
         vtk_mesh = actor.GetMapper().GetInput()
         mesh = pv.wrap(vtk_mesh)
         self.silhouette.SetInputData(mesh)
@@ -147,7 +150,7 @@ class SceneViewer(QWidget):
         self.highlight_actor = self.plotter.add_mesh(silhouette_mesh)
         self.highlight_actor.SetUserMatrix(actor.GetMatrix())
         return True
-    
+
     def update_silhouette(self):
         """Update the silhouette of the highlighted object."""
         self.silhouette.SetCamera(self.plotter.camera)
@@ -178,9 +181,7 @@ class SceneViewer(QWidget):
         else:
             position = np.asarray(camera.GetPosition(), dtype=float)
             focal_point = np.asarray(camera.GetFocalPoint(), dtype=float)
-            camera.SetPosition(
-                tuple(focal_point + (position - focal_point) / factor)
-            )
+            camera.SetPosition(tuple(focal_point + (position - focal_point) / factor))
         self._reset_clipping_range()
         self.plotter.render()
 
@@ -189,7 +190,7 @@ class SceneViewer(QWidget):
             return
         # One wheel step is 120 units. Smaller factors zoom out, larger zoom in.
         steps = delta / 120.0
-        self.zoom_camera(1.15 ** steps)
+        self.zoom_camera(1.15**steps)
 
     def _pan_camera(self, position):
         if self._pan_anchor is None:
@@ -205,7 +206,8 @@ class SceneViewer(QWidget):
         self._schedule_render()
 
     def _schedule_render(self):
-        """Coalesce rapid render requests (panning, per-tick transforms) into one frame."""
+        """Coalesce rapid render requests (panning, per-tick transforms)
+        into one frame."""
         if self._render_pending:
             return
         self._render_pending = True
@@ -232,17 +234,14 @@ class SceneViewer(QWidget):
             world_height = 2.0 * camera.GetParallelScale()
         else:
             distance = np.linalg.norm(
-                np.asarray(camera.GetFocalPoint())
-                - np.asarray(camera.GetPosition())
+                np.asarray(camera.GetFocalPoint()) - np.asarray(camera.GetPosition())
             )
-            world_height = 2.0 * distance * np.tan(
-                np.deg2rad(camera.GetViewAngle()) / 2.0
+            world_height = (
+                2.0 * distance * np.tan(np.deg2rad(camera.GetViewAngle()) / 2.0)
             )
 
         pixels_to_world = world_height / height
-        return pixels_to_world * (
-            -delta.x() * right + delta.y() * screen_up
-        )
+        return pixels_to_world * (-delta.x() * right + delta.y() * screen_up)
 
     def add_object(self, object_base: Any):
         block_object = getattr(object_base, "block_object", None)
@@ -312,7 +311,9 @@ class SceneViewer(QWidget):
                 if elevation_span <= 1e-12
                 else (elevation - elevation_min) / elevation_span
             )
-            normals = np.asarray(reference.point_data.get("Normals", np.zeros_like(points)))
+            normals = np.asarray(
+                reference.point_data.get("Normals", np.zeros_like(points))
+            )
             normal_z = np.clip((1.0 - normals[:, 2]) * 0.5, 0.0, 1.0)
             field_sources = getattr(
                 block_object, "colourmap_field_sources", ("elevation", "normal_z")
@@ -449,7 +450,7 @@ class SceneViewer(QWidget):
         actor.SetUserMatrix(as_vtk_matrix(transform))
         self._schedule_render()
         return True
-    
+
     def clear_scene(self):
         self.plotter.clear()
         if self._show_sky_dome:
@@ -461,4 +462,3 @@ class SceneViewer(QWidget):
         self.scene_model.clear()
         self.plotter.show_axes()
         self.plotter.render()
-

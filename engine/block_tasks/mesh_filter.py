@@ -78,8 +78,7 @@ class MeshFilterTask:
             )
             affected = distance != 0
             values[affected] = contour_level + (
-                distance[affected] / prepared["penetration"]
-                - (noise[affected] - 0.5)
+                distance[affected] / prepared["penetration"] - (noise[affected] - 0.5)
             )
             return values
         distance = self._surface_distance(active, prepared["penetration"])

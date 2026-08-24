@@ -1,12 +1,10 @@
-from typing import Optional
-
 from PySide6.QtGui import QIcon
 
+from common.icons import get_icon
 from components.tree.roots import colourmap_root
 from engine.block_objects import ColourmapBlockObject
 
 from .object_base import ObjectBase
-from common.icons import get_icon
 
 
 class ColourmapObject(ObjectBase):
@@ -15,17 +13,15 @@ class ColourmapObject(ObjectBase):
     def __init__(
         self,
         name: str = "Colourmap",
-        block_object: Optional[ColourmapBlockObject] = None,
+        block_object: ColourmapBlockObject | None = None,
         comments: str = "",
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         auto_register_root: bool = False,
     ):
         block = block_object or ColourmapBlockObject()
         if not isinstance(block, ColourmapBlockObject):
-            raise TypeError(
-                "ColourmapObject requires a ColourmapBlockObject"
-            )
+            raise TypeError("ColourmapObject requires a ColourmapBlockObject")
         self.colourmap_block_object = block
         super().__init__(
             name=name,

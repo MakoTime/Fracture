@@ -1,8 +1,9 @@
-from dataclasses import dataclass, field
-from types import MappingProxyType
-from pathlib import Path
-from typing import Iterable
 import json
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from itertools import pairwise
+from pathlib import Path
+from types import MappingProxyType
 
 import numpy as np
 
@@ -46,23 +47,31 @@ class ColourmapBlockObject(BlockObject):
         self.field2_positions = self._normalize_positions(self.field2_positions)
         if not self.colour_grid:
             self.colour_grid = tuple(
-                tuple(stop[1] for stop in self.stops)
-                for _ in self.field2_positions
+                tuple(stop[1] for stop in self.stops) for _ in self.field2_positions
             )
         self.colour_grid = self._normalize_grid(self.colour_grid)
-        if len(self.colour_grid) != len(self.field2_positions) or len(self.colour_grid[0]) != len(self.field1_positions):
+        if len(self.colour_grid) != len(self.field2_positions) or len(
+            self.colour_grid[0]
+        ) != len(self.field1_positions):
             raise ValueError("Colourmap grid must match both field position lists")
-        self.field1_curve_points = self._normalize_curve_points(self.field1_curve_points)
-        self.field1_curve_handles = self._normalize_curve_handles(self.field1_curve_handles)
-        self.field2_curve_points = self._normalize_curve_points(self.field2_curve_points)
-        self.field2_curve_handles = self._normalize_curve_handles(self.field2_curve_handles)
+        self.field1_curve_points = self._normalize_curve_points(
+            self.field1_curve_points
+        )
+        self.field1_curve_handles = self._normalize_curve_handles(
+            self.field1_curve_handles
+        )
+        self.field2_curve_points = self._normalize_curve_points(
+            self.field2_curve_points
+        )
+        self.field2_curve_handles = self._normalize_curve_handles(
+            self.field2_curve_handles
+        )
         if self.perlin_noise_transform is not None and not isinstance(
             self.perlin_noise_transform,
             PerlinNoiseTransformBlockObject,
         ):
             raise TypeError(
-                "perlin_noise_transform must be a "
-                "PerlinNoiseTransformBlockObject"
+                "perlin_noise_transform must be a PerlinNoiseTransformBlockObject"
             )
         self.noise_enabled = bool(self.noise_enabled)
         if self.perlin_noise_transform is not None:
@@ -73,7 +82,9 @@ class ColourmapBlockObject(BlockObject):
 
     @staticmethod
     def _normalize_curve_points(points):
-        normalized = tuple(sorted((float(point[0]), float(point[1])) for point in points))
+        normalized = tuple(
+            sorted((float(point[0]), float(point[1])) for point in points)
+        )
         if len(normalized) < 2:
             return ((0.0, 0.0), (1.0, 1.0))
         return ((0.0, normalized[0][1]), *normalized[1:-1], (1.0, normalized[-1][1]))
@@ -81,7 +92,9 @@ class ColourmapBlockObject(BlockObject):
     @staticmethod
     def _normalize_curve_handles(handles):
         return tuple(
-            None if handle is None else tuple((float(point[0]), float(point[1])) for point in handle)
+            None
+            if handle is None
+            else tuple((float(point[0]), float(point[1])) for point in handle)
             for handle in handles
         )
 
@@ -112,7 +125,9 @@ class ColourmapBlockObject(BlockObject):
                 rgba = tuple(float(channel) for channel in colour)
                 if len(rgba) == 3:
                     rgba += (1.0,)
-                if len(rgba) != 4 or any(channel < 0.0 or channel > 1.0 for channel in rgba):
+                if len(rgba) != 4 or any(
+                    channel < 0.0 or channel > 1.0 for channel in rgba
+                ):
                     raise ValueError("Colourmap channels must be between 0 and 1")
                 normalized_row.append(rgba)
             normalized.append(tuple(normalized_row))
@@ -137,9 +152,7 @@ class ColourmapBlockObject(BlockObject):
             raise ValueError("Colourmap stop positions must be between 0 and 1")
         if any(
             position == next_position
-            for (position, _), (next_position, _) in zip(
-                normalized, normalized[1:]
-            )
+            for (position, _), (next_position, _) in pairwise(normalized)
         ):
             raise ValueError("Colourmap stop positions must be unique")
         if any(
@@ -159,29 +172,30 @@ class ColourmapBlockObject(BlockObject):
         field1_curve_handles = self._normalize_curve_handles(self.field1_curve_handles)
         field2_curve_points = self._normalize_curve_points(self.field2_curve_points)
         field2_curve_handles = self._normalize_curve_handles(self.field2_curve_handles)
-        if len(colour_grid) != len(field2_positions) or len(
-            colour_grid[0]
-        ) != len(field1_positions):
+        if len(colour_grid) != len(field2_positions) or len(colour_grid[0]) != len(
+            field1_positions
+        ):
             raise ValueError("Colourmap grid must match both field position lists")
         if self.perlin_noise_transform is not None and not isinstance(
             self.perlin_noise_transform,
             PerlinNoiseTransformBlockObject,
         ):
             raise TypeError(
-                "perlin_noise_transform must be a "
-                "PerlinNoiseTransformBlockObject"
+                "perlin_noise_transform must be a PerlinNoiseTransformBlockObject"
             )
-        return MappingProxyType({
-            "stops": stops,
-            "field1_positions": field1_positions,
-            "field2_positions": field2_positions,
-            "colour_grid": colour_grid,
-            "field1_curve_points": field1_curve_points,
-            "field1_curve_handles": field1_curve_handles,
-            "field2_curve_points": field2_curve_points,
-            "field2_curve_handles": field2_curve_handles,
-            "noise_enabled": bool(self.noise_enabled),
-        })
+        return MappingProxyType(
+            {
+                "stops": stops,
+                "field1_positions": field1_positions,
+                "field2_positions": field2_positions,
+                "colour_grid": colour_grid,
+                "field1_curve_points": field1_curve_points,
+                "field1_curve_handles": field1_curve_handles,
+                "field2_curve_points": field2_curve_points,
+                "field2_curve_handles": field2_curve_handles,
+                "noise_enabled": bool(self.noise_enabled),
+            }
+        )
 
     def process(self, prepared, progress_callback=None):
         if progress_callback:
@@ -196,7 +210,9 @@ class ColourmapBlockObject(BlockObject):
         try:
             field1, field2 = fields
         except (TypeError, ValueError) as error:
-            raise ValueError("Colourmap fields must contain exactly two arrays") from error
+            raise ValueError(
+                "Colourmap fields must contain exactly two arrays"
+            ) from error
         return self._apply_fields(field1, field2)
 
     def update_from(self, source):
@@ -218,12 +234,24 @@ class ColourmapBlockObject(BlockObject):
         self.field1_positions = self._normalize_positions(self.field1_positions)
         self.field2_positions = self._normalize_positions(self.field2_positions)
         self.colour_grid = self._normalize_grid(self.colour_grid)
-        self.field1_curve_points = self._normalize_curve_points(self.field1_curve_points)
-        self.field1_curve_handles = self._normalize_curve_handles(self.field1_curve_handles)
-        self.field2_curve_points = self._normalize_curve_points(self.field2_curve_points)
-        self.field2_curve_handles = self._normalize_curve_handles(self.field2_curve_handles)
+        self.field1_curve_points = self._normalize_curve_points(
+            self.field1_curve_points
+        )
+        self.field1_curve_handles = self._normalize_curve_handles(
+            self.field1_curve_handles
+        )
+        self.field2_curve_points = self._normalize_curve_points(
+            self.field2_curve_points
+        )
+        self.field2_curve_handles = self._normalize_curve_handles(
+            self.field2_curve_handles
+        )
         self.set_perlin_noise_transform(
-            getattr(source.perlin_noise_transform, "block_object", source.perlin_noise_transform)
+            getattr(
+                source.perlin_noise_transform,
+                "block_object",
+                source.perlin_noise_transform,
+            )
         )
         self.prepare()
         self.mark_changed()
@@ -236,8 +264,7 @@ class ColourmapBlockObject(BlockObject):
             PerlinNoiseTransformBlockObject,
         ):
             raise TypeError(
-                "perlin_noise_transform must be a "
-                "PerlinNoiseTransformBlockObject"
+                "perlin_noise_transform must be a PerlinNoiseTransformBlockObject"
             )
         if self.perlin_noise_transform is transform:
             return transform
@@ -289,7 +316,10 @@ class ColourmapBlockObject(BlockObject):
         colours = np.asarray([stop[1] for stop in self.stops])
         clipped = np.clip(scalar_values, positions[0], positions[-1])
         channels = np.stack(
-            [np.interp(clipped, positions, colours[:, channel]) for channel in range(4)],
+            [
+                np.interp(clipped, positions, colours[:, channel])
+                for channel in range(4)
+            ],
             axis=-1,
         )
         return channels
@@ -304,21 +334,39 @@ class ColourmapBlockObject(BlockObject):
         second = np.clip(np.asarray(field2, dtype=float), 0.0, 1.0)
         if first.shape != second.shape:
             raise ValueError("Colourmap fields must have matching shapes")
-        first = self._evaluate_curve(first, self.field1_curve_points, self.field1_curve_handles)
-        second = self._evaluate_curve(second, self.field2_curve_points, self.field2_curve_handles)
+        first = self._evaluate_curve(
+            first, self.field1_curve_points, self.field1_curve_handles
+        )
+        second = self._evaluate_curve(
+            second, self.field2_curve_points, self.field2_curve_handles
+        )
         x_positions = np.asarray(self.field1_positions, dtype=float)
         y_positions = np.asarray(self.field2_positions, dtype=float)
-        x_index = np.clip(np.searchsorted(x_positions, first, side="right") - 1, 0, len(x_positions) - 2)
-        y_index = np.clip(np.searchsorted(y_positions, second, side="right") - 1, 0, len(y_positions) - 2)
-        x_ratio = (first - x_positions[x_index]) / np.maximum(1e-12, x_positions[x_index + 1] - x_positions[x_index])
-        y_ratio = (second - y_positions[y_index]) / np.maximum(1e-12, y_positions[y_index + 1] - y_positions[y_index])
+        x_index = np.clip(
+            np.searchsorted(x_positions, first, side="right") - 1,
+            0,
+            len(x_positions) - 2,
+        )
+        y_index = np.clip(
+            np.searchsorted(y_positions, second, side="right") - 1,
+            0,
+            len(y_positions) - 2,
+        )
+        x_ratio = (first - x_positions[x_index]) / np.maximum(
+            1e-12, x_positions[x_index + 1] - x_positions[x_index]
+        )
+        y_ratio = (second - y_positions[y_index]) / np.maximum(
+            1e-12, y_positions[y_index + 1] - y_positions[y_index]
+        )
         grid = np.asarray(self.colour_grid, dtype=float)
         top_left = grid[y_index, x_index]
         top_right = grid[y_index, x_index + 1]
         bottom_left = grid[y_index + 1, x_index]
         bottom_right = grid[y_index + 1, x_index + 1]
         top = (1.0 - x_ratio)[..., None] * top_left + x_ratio[..., None] * top_right
-        bottom = (1.0 - x_ratio)[..., None] * bottom_left + x_ratio[..., None] * bottom_right
+        bottom = (1.0 - x_ratio)[..., None] * bottom_left + x_ratio[
+            ..., None
+        ] * bottom_right
         return (1.0 - y_ratio)[..., None] * top + y_ratio[..., None] * bottom
 
     @staticmethod
@@ -395,11 +443,21 @@ class ColourmapBlockObject(BlockObject):
                     "field2_name": self.field2_name,
                     "field1_positions": list(self.field1_positions),
                     "field2_positions": list(self.field2_positions),
-                    "colour_grid": [[list(colour) for colour in row] for row in self.colour_grid],
-                    "field1_curve_points": [list(point) for point in self.field1_curve_points],
-                    "field1_curve_handles": self._json_handles(self.field1_curve_handles),
-                    "field2_curve_points": [list(point) for point in self.field2_curve_points],
-                    "field2_curve_handles": self._json_handles(self.field2_curve_handles),
+                    "colour_grid": [
+                        [list(colour) for colour in row] for row in self.colour_grid
+                    ],
+                    "field1_curve_points": [
+                        list(point) for point in self.field1_curve_points
+                    ],
+                    "field1_curve_handles": self._json_handles(
+                        self.field1_curve_handles
+                    ),
+                    "field2_curve_points": [
+                        list(point) for point in self.field2_curve_points
+                    ],
+                    "field2_curve_handles": self._json_handles(
+                        self.field2_curve_handles
+                    ),
                     "noise_enabled": self.noise_enabled,
                     "perlin_noise_transform_guid": (
                         None
@@ -434,10 +492,19 @@ class ColourmapBlockObject(BlockObject):
             field2_name=data.get("field2_name", "Field 2"),
             field1_positions=tuple(data.get("field1_positions", (0.0, 1.0))),
             field2_positions=tuple(data.get("field2_positions", (0.0, 1.0))),
-            colour_grid=tuple(tuple(tuple(colour) for colour in row) for row in data.get("colour_grid", ())),
-            field1_curve_points=tuple(tuple(point) for point in data.get("field1_curve_points", ((0.0, 0.0), (1.0, 1.0)))),
+            colour_grid=tuple(
+                tuple(tuple(colour) for colour in row)
+                for row in data.get("colour_grid", ())
+            ),
+            field1_curve_points=tuple(
+                tuple(point)
+                for point in data.get("field1_curve_points", ((0.0, 0.0), (1.0, 1.0)))
+            ),
             field1_curve_handles=tuple(data.get("field1_curve_handles", (None, None))),
-            field2_curve_points=tuple(tuple(point) for point in data.get("field2_curve_points", ((0.0, 0.0), (1.0, 1.0)))),
+            field2_curve_points=tuple(
+                tuple(point)
+                for point in data.get("field2_curve_points", ((0.0, 0.0), (1.0, 1.0)))
+            ),
             field2_curve_handles=tuple(data.get("field2_curve_handles", (None, None))),
             noise_enabled=data.get("noise_enabled", True),
             stops=tuple(

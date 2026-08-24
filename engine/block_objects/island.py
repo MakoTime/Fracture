@@ -104,8 +104,13 @@ class IslandBlockObject(BlockObject):
             self._mark_changed({}, invalidates=False)
 
     def update_configuration(
-        self, *, core_offset=None, orbit_speed=None,
-        orbit_normal=None, orbit_angle=None, curve_mesh=None
+        self,
+        *,
+        core_offset=None,
+        orbit_speed=None,
+        orbit_normal=None,
+        orbit_angle=None,
+        curve_mesh=None,
     ):
         if core_offset is not None:
             self.core_offset = self._normalize_core_offset(core_offset)
@@ -151,12 +156,8 @@ class IslandBlockObject(BlockObject):
             np.asarray(self.orbit_normal),
             self.orbit_angle_at_time(elapsed_seconds),
         )
-        initial_frame = np.column_stack(
-            (initial_tangent, initial_up, initial_radial)
-        )
-        current_frame = np.column_stack(
-            (current_tangent, current_up, current_radial)
-        )
+        initial_frame = np.column_stack((initial_tangent, initial_up, initial_radial))
+        current_frame = np.column_stack((current_tangent, current_up, current_radial))
         linear = current_frame @ initial_frame.T
         initial_position = centre + self.core_offset * initial_radial
         current_position = centre + self.core_offset * current_radial
@@ -179,7 +180,10 @@ class IslandBlockObject(BlockObject):
         return self
 
     def set_mesh_data(self, mesh_data):
-        """Cache a renderable-adjusted copy so normals aren't recomputed every render."""
+        """Cache a renderable-adjusted copy so
+        normals aren't recomputed every render.
+        """
+
         self.mesh_data = mesh_data
         return mesh_data
 

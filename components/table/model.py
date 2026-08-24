@@ -64,12 +64,16 @@ class TableModel(QAbstractTableModel):
         super().__init__()
         self.table_manager = table_manager
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         if parent.isValid():
             return 0
         return len(self.table_manager.get_data())
 
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return len(self.Headers)
 
     def add_row(self, row_data: RowData):
@@ -169,7 +173,9 @@ class TableModel(QAbstractTableModel):
             return self.Headers[section]
         return None
 
-    def index(self, row, column, parent=QModelIndex()):
+    def index(self, row, column, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
         return self.createIndex(row, column)

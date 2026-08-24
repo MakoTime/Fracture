@@ -36,14 +36,13 @@ class _VectorWidget(QWidget):
 class Vector3Widget(_VectorWidget):
     def __init__(self, parent=None):
         super().__init__(3, parent)
-        
-        
+
 
 class Vector2Widget(_VectorWidget):
     def __init__(self, parent=None):
         super().__init__(2, parent)
-        
-        
+
+
 class IntegerVector3Widget(QWidget):
     """Compact editor for three positive integer dimensions."""
 

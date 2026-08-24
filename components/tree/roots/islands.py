@@ -1,5 +1,6 @@
-from ..model import TreeNode
 from common.icons import get_icon
+
+from ..model import TreeNode
 
 
 class IslandRoot(TreeNode):

@@ -1,23 +1,23 @@
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
     QFileDialog,
     QHeaderView,
 )
-from PySide6.QtCore import QTimer
 
+from application.importers import ObjectImporterModel
+from application.importers.colourmap_controller import ColourmapController
+from application.importers.island_controller import IslandController
+from application.importers.transform_controller import TransformController
+from application.importers.world_config_controller import WorldConfigController
+from application.project_serializer import ProjectSerializer
 from components.tree import TreeManager, TreeModel
 from components.tree.roots import root_objects
-from menu import setup_menu
-from application.importers import ObjectImporterModel
-from application.importers.transform_controller import TransformController
-from application.importers.colourmap_controller import ColourmapController
-from application.importers.world_config_controller import WorldConfigController
-from application.importers.island_controller import IslandController
-from application.project_serializer import ProjectSerializer
 from dialog.notify import create_notification
+from menu import setup_menu
 
 
 class ProjectController:
@@ -54,18 +54,14 @@ class ProjectController:
         self.window.scene_viewer = self.window.sceneViewer
         self.window.engine_runner = self.window.engineRunner
         self._lock_scene_docks()
-        self.window.worldStateView.set_scene_model(
-            self.window.scene_viewer.scene_model
-        )
+        self.window.worldStateView.set_scene_model(self.window.scene_viewer.scene_model)
         self.object_importer = ObjectImporterModel(
             table_model=self.table_model,
             tree_manager=self.tree_manager,
             scene_viewer=self.window.scene_viewer,
             tree_model=self.tree_model,
         )
-        self.object_importer.set_project_save_callback(
-            self._save_project_after_block
-        )
+        self.object_importer.set_project_save_callback(self._save_project_after_block)
         self.window.worldStateView.timer_controller = (
             self.object_importer.timer_controller
         )
@@ -143,12 +139,12 @@ class ProjectController:
         main_splitter = self.window.sceneMainSplitter
         main_splitter.setStretchFactor(0, 5)
         main_splitter.setStretchFactor(1, 1)
-        QTimer.singleShot(0, lambda: self._set_scene_splitter_sizes(
-            navigation_splitter, (2, 1)
-        ))
-        QTimer.singleShot(0, lambda: self._set_scene_splitter_sizes(
-            main_splitter, (5, 1)
-        ))
+        QTimer.singleShot(
+            0, lambda: self._set_scene_splitter_sizes(navigation_splitter, (2, 1))
+        )
+        QTimer.singleShot(
+            0, lambda: self._set_scene_splitter_sizes(main_splitter, (5, 1))
+        )
 
     @staticmethod
     def _set_scene_splitter_sizes(splitter, ratio):
@@ -197,10 +193,10 @@ class ProjectController:
         )
         dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
         dialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        dialog.setNameFilter(
-            "RainFall projects (project.json);;JSON files (*.json)"
+        dialog.setNameFilter("RainFall projects (project.json);;JSON files (*.json)")
+        default_directory = (
+            self.project_file.parent if self.project_file else Path.home()
         )
-        default_directory = self.project_file.parent if self.project_file else Path.home()
         default_name = self.project_file.name if self.project_file else "project.json"
         dialog.setDirectory(str(default_directory))
         dialog.selectFile(default_name)

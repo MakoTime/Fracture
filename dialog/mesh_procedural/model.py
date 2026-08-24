@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass, field
 from uuid import uuid4
 
@@ -60,15 +59,15 @@ class MeshProceduralModel(EditorModel):
         settings["perlin_noise_transform"] = transform_model
         settings["seed"] = transform_model.seed if transform_model is not None else None
         return cls(**settings)
-    
+
     def __setattr__(self, name, value):
         if name == "perlin_noise_transform" and value is not None:
             transform = getattr(value, "block_object", value)
             self.seed = transform.seed
         super().__setattr__(name, value)
-    
+
     def generate(self) -> ProceduralMeshObject:
-        """Synchronously run the generation block task."""
+        """Run the generation block task synchronously."""
         task = self.to_mesh_generate_task()
         prepared = task.prepare()
         block_object = task.execute(prepared)
@@ -85,7 +84,7 @@ class MeshProceduralModel(EditorModel):
     def to_mesh_generate_task(self) -> ProceduralMeshTask:
         """Create the engine task for this procedural mesh configuration."""
         return ProceduralMeshTask(self)
-    
+
     def grid_points(self):
         """Return preview points for the configured integer grid dimensions."""
         dimensions = tuple(max(1, int(value)) for value in self.grid_size)
@@ -96,7 +95,7 @@ class MeshProceduralModel(EditorModel):
             indexing="ij",
         )
         return np.column_stack((x.ravel(), y.ravel(), z.ravel()))
-    
+
     def _settings(self):
         transform = self.perlin_noise_transform
         if hasattr(transform, "block_object"):

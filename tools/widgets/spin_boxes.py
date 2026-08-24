@@ -1,7 +1,13 @@
-
-
 from PySide6.QtCore import QSize, Signal
-from PySide6.QtWidgets import QAbstractSpinBox, QHBoxLayout, QSpinBox, QStyle, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QAbstractSpinBox,
+    QHBoxLayout,
+    QSpinBox,
+    QStyle,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 from qtpy.QtWidgets import QDoubleSpinBox
 
 

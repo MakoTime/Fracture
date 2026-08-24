@@ -2,12 +2,11 @@ from pathlib import Path
 
 from PySide6.QtGui import QIcon
 
-
 ICON_DIRECTORY = Path(__file__).resolve().parent.parent / "icons"
 
 
 def _icon(filename: str) -> QIcon:
-	return QIcon(str(ICON_DIRECTORY / filename))
+    return QIcon(str(ICON_DIRECTORY / filename))
 
 
 ALERT_OCTAGON_ICON = _icon("alert_octagon.svg")
@@ -42,41 +41,41 @@ SHAPE_CUBE_ICON = _icon("shape_cube.svg")
 
 
 ICONS = {
-	"alert_octagon": ALERT_OCTAGON_ICON,
-	"bin": BIN_ICON,
-	"blood_drop": BLOOD_DROP_ICON,
-	"colour_palette": COLOUR_PALETTE_ICON,
-	"dashboard_warning": DASHBOARD_WARNING_ICON,
-	"earth": EARTH_ICON,
-	"floating_island": FLOATING_ISLAND_ICON,
-	"folder": FOLDER_ICON,
-	"folder_collapsed": FOLDER_COLLAPSED_ICON,
-	"folder_expanded": FOLDER_EXPANDED_ICON,
-	"grid": GRID_ICON,
-	"info": INFO_ICON,
-	"map": MAP_ICON,
-	"orbit": ORBIT_ICON,
-	"notes": NOTES_ICON,
-	"pause": PAUSE_ICON,
-	"play": PLAY_ICON,
-	"rewind": REWIND_ICON,
-	"fast_forward": FAST_FORWARD_ICON,
-	"rewind_2": REWIND_2_ICON,
-	"rewind_3": REWIND_3_ICON,
-	"fast_forward_2": FAST_FORWARD_2_ICON,
-	"fast_forward_3": FAST_FORWARD_3_ICON,
-	"rain_umbrella": RAIN_UMBRELLA_ICON,
-	"save": SAVE_ICON,
-	"visible": VISIBLE_ICON,
-	"invisible": INVISIBLE_ICON,
-	"photo_changed_filter": PHOTO_CHANGED_FILTER_ICON,
-	"shape_cube": SHAPE_CUBE_ICON,
+    "alert_octagon": ALERT_OCTAGON_ICON,
+    "bin": BIN_ICON,
+    "blood_drop": BLOOD_DROP_ICON,
+    "colour_palette": COLOUR_PALETTE_ICON,
+    "dashboard_warning": DASHBOARD_WARNING_ICON,
+    "earth": EARTH_ICON,
+    "floating_island": FLOATING_ISLAND_ICON,
+    "folder": FOLDER_ICON,
+    "folder_collapsed": FOLDER_COLLAPSED_ICON,
+    "folder_expanded": FOLDER_EXPANDED_ICON,
+    "grid": GRID_ICON,
+    "info": INFO_ICON,
+    "map": MAP_ICON,
+    "orbit": ORBIT_ICON,
+    "notes": NOTES_ICON,
+    "pause": PAUSE_ICON,
+    "play": PLAY_ICON,
+    "rewind": REWIND_ICON,
+    "fast_forward": FAST_FORWARD_ICON,
+    "rewind_2": REWIND_2_ICON,
+    "rewind_3": REWIND_3_ICON,
+    "fast_forward_2": FAST_FORWARD_2_ICON,
+    "fast_forward_3": FAST_FORWARD_3_ICON,
+    "rain_umbrella": RAIN_UMBRELLA_ICON,
+    "save": SAVE_ICON,
+    "visible": VISIBLE_ICON,
+    "invisible": INVISIBLE_ICON,
+    "photo_changed_filter": PHOTO_CHANGED_FILTER_ICON,
+    "shape_cube": SHAPE_CUBE_ICON,
 }
 
 
 def get_icon(name: str) -> QIcon:
-	"""Return a named application icon."""
-	try:
-		return ICONS[name]
-	except KeyError as error:
-		raise KeyError(f"unknown icon: {name}") from error
+    """Return a named application icon."""
+    try:
+        return ICONS[name]
+    except KeyError as error:
+        raise KeyError(f"unknown icon: {name}") from error

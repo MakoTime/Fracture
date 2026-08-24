@@ -3,8 +3,7 @@ from dataclasses import replace
 import numpy as np
 import pyvista as pv
 
-from engine.block_objects import ProceduralMeshBlock
-from engine.block_objects import PerlinNoiseTransformBlockObject
+from engine.block_objects import PerlinNoiseTransformBlockObject, ProceduralMeshBlock
 
 
 class ProceduralMeshTask:
@@ -40,9 +39,7 @@ class ProceduralMeshTask:
         dimensions = tuple(max(1, int(value)) for value in self.model.grid_size)
         lower_threshold = float(self.model.lower_threshold)
         upper_threshold = float(self.model.upper_threshold)
-        if not np.isfinite(
-            [lower_threshold, upper_threshold]
-        ).all():
+        if not np.isfinite([lower_threshold, upper_threshold]).all():
             raise ValueError("procedural mesh settings must be finite")
         if lower_threshold > upper_threshold:
             raise ValueError("lower_threshold must not exceed upper_threshold")
@@ -66,9 +63,8 @@ class ProceduralMeshTask:
                 prepared["transform"],
             )
         report(0.5)
-        selected = (
-            (grid_data >= prepared["lower_threshold"])
-            & (grid_data <= prepared["upper_threshold"])
+        selected = (grid_data >= prepared["lower_threshold"]) & (
+            grid_data <= prepared["upper_threshold"]
         )
         grid_data = np.where(selected, grid_data, 0.0)
         mesh = self._build_surface_mesh(grid_data)

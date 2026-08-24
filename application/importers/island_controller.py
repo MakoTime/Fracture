@@ -3,18 +3,24 @@ from PySide6.QtWidgets import QTabWidget, QTreeView, QWidget
 from common.icons import get_icon
 from components.tree import TreeModel, TreeSearch
 from components.tree.roots import island_root, world_config
-from objects.mesh_object import MeshObject
 from dialog.island import create_island_dialog
 from engine.block_objects import IslandBlockObject
 from engine.block_tasks import IslandTask
 from objects.island import Island
+from objects.mesh_object import MeshObject
 from tools.dropdown import create_dropdown_menu
 
 
 class IslandController:
     """Provide editing for Island objects."""
 
-    def __init__(self, object_importer, tree_view: QTreeView, parent: QWidget | None = None, engine_runner=None):
+    def __init__(
+        self,
+        object_importer,
+        tree_view: QTreeView,
+        parent: QWidget | None = None,
+        engine_runner=None,
+    ):
         self.object_importer = object_importer
         self.tree_view = tree_view
         self.parent = parent
@@ -41,8 +47,10 @@ class IslandController:
             )
         if isinstance(node.node_object, Island):
             return create_dropdown_menu(
-                (("Edit", lambda: self.edit(node.node_object)),
-                 ("Delete", lambda: self.delete(node.node_object), get_icon("bin"))),
+                (
+                    ("Edit", lambda: self.edit(node.node_object)),
+                    ("Delete", lambda: self.delete(node.node_object), get_icon("bin")),
+                ),
                 parent,
             )
         return create_dropdown_menu((), parent)
@@ -66,7 +74,9 @@ class IslandController:
             new_island=True,
             on_apply=lambda result: self._register_new_island(result),
         )
-        tabs = self.parent.findChild(QTabWidget, "workspaceTabs") if self.parent else None
+        tabs = (
+            self.parent.findChild(QTabWidget, "workspaceTabs") if self.parent else None
+        )
         if tabs is None:
             dialog.show()
         else:

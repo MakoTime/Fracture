@@ -7,7 +7,6 @@ version checks throughout the persistence code.
 from collections.abc import Callable
 from typing import Any
 
-
 CURRENT_PROJECT_VERSION = 1
 LEGACY_FORMAT_KEY = "format"
 VERSION_KEY = "version"

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import ColourmapModel
@@ -7,8 +5,8 @@ from .view import ColourmapView
 
 
 def create_colourmap_dialog(
-    model: Optional[ColourmapModel] = None,
-    parent: Optional[QWidget] = None,
+    model: ColourmapModel | None = None,
+    parent: QWidget | None = None,
     tree_search=None,
     deduper=None,
 ) -> ColourmapView:

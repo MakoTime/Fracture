@@ -2,10 +2,10 @@ import json
 from types import SimpleNamespace
 
 from application.file_window import (
+    ProjectEntry,
     ProjectListModel,
     ProjectMetadataModel,
     RecentProjectStore,
-    ProjectEntry,
     _new_project_file,
 )
 from application.project_controller import ProjectController
@@ -106,9 +106,11 @@ def test_new_project_creates_empty_saved_project(qapp, tmp_path):
     controller = ProjectController.__new__(ProjectController)
     controller.project_serializer = ProjectSerializer()
     controller.table_model = table_model
-    controller.window = SimpleNamespace(scene_viewer=SimpleNamespace(
-        scene_model=SimpleNamespace(objects=[]),
-    ))
+    controller.window = SimpleNamespace(
+        scene_viewer=SimpleNamespace(
+            scene_model=SimpleNamespace(objects=[]),
+        )
+    )
     controller.object_importer = SimpleNamespace()
 
     saved_file = controller.create_project(project_file)

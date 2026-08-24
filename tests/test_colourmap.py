@@ -1,17 +1,19 @@
-import numpy as np
-import pyvista as pv
-import pytest
 from types import SimpleNamespace
 
-from components.tree import TreeManager
-from components.tree import TreeSearch
+import numpy as np
+import pytest
+import pyvista as pv
+
+from components.tree import TreeManager, TreeSearch
 from components.tree.roots import colourmap_root, root_objects, transform_root
 from dialog.colourmap import ColourmapModel, create_colourmap_dialog
 from dialog.colourmap.graph import ColourmapPreview
 from dialog.mesh_colourmap import MeshColourmapModel
-from engine.block_objects import ColourmapBlockObject
-from engine.block_objects import PerlinNoiseTransformBlockObject
-from engine.block_objects import MeshBlockObject
+from engine.block_objects import (
+    ColourmapBlockObject,
+    MeshBlockObject,
+    PerlinNoiseTransformBlockObject,
+)
 from objects.colourmap import ColourmapObject
 
 
@@ -33,7 +35,7 @@ def test_colourmap_block_interpolates_and_clamps_rgba_values():
 
 def test_colourmap_process_runs_value_calculation():
     block = ColourmapBlockObject()
-    prepared = block.prepare()
+    _prepared = block.prepare()
 
     processed = block.calculate_values(np.array([0.25, 0.75]))
 
@@ -342,7 +344,9 @@ def test_colourmap_dialog_updates_stops_and_optional_transform(qapp):
         assert model.colour_grid[0][0] == (0.25, 0.5, 0.75, 1.0)
         assert dialog.colourmap_preview.colour_grid[0][0] == model.colour_grid[0][0]
         assert model.perlin_noise_transform is noise
-        assert model.to_object().block_object.perlin_noise_transform is noise.block_object
+        assert (
+            model.to_object().block_object.perlin_noise_transform is noise.block_object
+        )
         dialog.close()
     finally:
         noise.remove_from_tree()

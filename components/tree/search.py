@@ -17,10 +17,9 @@ class TreeSearch:
             self._collect(root, filter, matches, seen)
         return matches
 
+
     def _collect(self, node, filter, matches, seen):
-        if node.node_object is not None and (
-            filter is None or filter(node)
-        ):
+        if node.node_object is not None and (filter is None or filter(node)):
             identity = getattr(node.node_object, "guid", id(node.node_object))
             if identity not in seen:
                 matches.append(node.node_object)

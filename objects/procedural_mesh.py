@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 from PySide6.QtGui import QIcon
@@ -16,14 +16,16 @@ class ProceduralMeshObject(MeshObject):
         name: str,
         grid_data: Any = None,
         mesh_data: Any = None,
-        block_object: Optional[ProceduralMeshBlock] = None,
+        block_object: ProceduralMeshBlock | None = None,
         comments: str = "",
         visible: bool = False,
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         auto_register_root: bool = False,
     ):
-        if block_object is not None and not isinstance(block_object, ProceduralMeshBlock):
+        if block_object is not None and not isinstance(
+            block_object, ProceduralMeshBlock
+        ):
             raise TypeError("ProceduralMeshObject requires a ProceduralMeshBlock")
         validated_grid_data = (
             block_object.grid_data.copy()

@@ -25,9 +25,7 @@ def test_procedural_task_builds_deterministic_thresholded_scalar_grid():
     first_result = first.process(first.prepare())
     second_result = second.process(second.prepare())
 
-    np.testing.assert_array_equal(
-        first_result["grid_data"], second_result["grid_data"]
-    )
+    np.testing.assert_array_equal(first_result["grid_data"], second_result["grid_data"])
     np.testing.assert_array_equal(
         first_result["mesh_data"].points,
         second_result["mesh_data"].points,

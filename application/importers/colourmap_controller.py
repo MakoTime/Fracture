@@ -1,13 +1,11 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QDialog, QTreeView, QWidget
 
+from common.icons import get_icon
 from components.tree import TreeModel
 from components.tree.roots import colourmap_root, root_objects
 from dialog.colourmap import ColourmapModel, create_colourmap_dialog
 from objects.colourmap import ColourmapObject
 from tools.dropdown import create_dropdown_menu
-from common.icons import get_icon
 
 
 class ColourmapController:
@@ -17,7 +15,7 @@ class ColourmapController:
         self,
         object_importer,
         tree_view: QTreeView,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         engine_runner=None,
     ):
         self.object_importer = object_importer

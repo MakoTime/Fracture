@@ -1,22 +1,26 @@
-from engine import EngineRunner, EngineTaskModel, TaskStatus
-from engine.block_objects import BlockObject
-from engine.block_tasks import PerlinNoiseTransformTask
-from engine.block_objects import PerlinNoiseTransformBlockObject
+import numpy as np
+import pyvista as pv
+
 from dialog.mesh_filter import MeshFilterModel
 from dialog.mesh_generate import MeshGenerateModel
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
-from engine.block_tasks import GeneratedMeshTask, MeshFilterTask
+from engine import EngineRunner, EngineTaskModel, TaskStatus
 from engine.block_objects import (
+    BlockObject,
     ColourmapBlockObject,
     GeneratedMeshBlockObject,
     IslandBlockObject,
     MeshBlockObject,
+    PerlinNoiseTransformBlockObject,
     WorldConfigBlockObject,
 )
-from engine.block_tasks import IslandTask
+from engine.block_tasks import (
+    GeneratedMeshTask,
+    IslandTask,
+    MeshFilterTask,
+    PerlinNoiseTransformTask,
+)
 from engine.block_tasks.island import _orbit_frame, build_island_mesh
-import numpy as np
-import pyvista as pv
 from objects.island import Island
 
 
@@ -101,7 +105,9 @@ def test_island_uses_core_offset_and_orientation_to_derive_position():
     assert application_island.orbit_normal == (0.0, 0.0, 1.0)
     assert application_island.orbit_angle == 90.0
     assert application_island.curve_mesh is True
-    assert np.linalg.norm(np.asarray(island.mesh_data.center) - world_config.centre) == 5.0
+    assert (
+        np.linalg.norm(np.asarray(island.mesh_data.center) - world_config.centre) == 5.0
+    )
 
     world_config.update_configuration(centre=(0.0, 0.0, 0.0))
     assert not island.is_valid()
@@ -318,7 +324,9 @@ def test_island_orbit_transform_moves_baked_mesh_without_rebuilding_it():
     transformed_points = (transform @ homogeneous_points.T).T[:, :3]
     expected_radial, _, _ = _orbit_frame(island.orbit_normal, 180.0)
 
-    assert np.allclose(transformed_points.mean(axis=0), world_config.centre + 5.0 * expected_radial)
+    assert np.allclose(
+        transformed_points.mean(axis=0), world_config.centre + 5.0 * expected_radial
+    )
     assert np.allclose(island.mesh_data.points, initial_points)
 
 
@@ -335,9 +343,7 @@ def test_island_orbit_normal_is_normalized_and_controls_angle_motion():
 
 def test_island_orbit_frame_is_orthonormal_at_both_poles():
     for orbit_angle in (0.0, 180.0, 360.0):
-        radial, tangent, local_up = _orbit_frame(
-            np.array((0.0, 1.0, 0.0)), orbit_angle
-        )
+        radial, tangent, local_up = _orbit_frame(np.array((0.0, 1.0, 0.0)), orbit_angle)
 
         assert np.isclose(np.linalg.norm(radial), 1.0)
         assert np.isclose(np.linalg.norm(tangent), 1.0)
@@ -527,6 +533,7 @@ def test_mark_changed_propagates_change_callbacks_to_parents():
     assert changes == ["Child", "Parent"]
     assert not child.is_valid()
     assert not parent.is_valid()
+
 
 def test_invalid_child_is_reprocessed_before_its_parent(qapp):
     model = EngineTaskModel()
@@ -733,8 +740,6 @@ def test_invalidation_handles_dependency_cycles_once():
     first.invalidate()
 
     assert callbacks == ["First", "Second"]
-
-
 
 
 def test_destroyed_non_dependent_child_only_invalidates_parent():

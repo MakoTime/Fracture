@@ -1,8 +1,9 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QTableView, QPushButton
+from PySide6.QtWidgets import QPushButton, QTableView
 
 from common.icons import get_icon
 from tools.widgets import VisibleWidget
+
 from .model import TableManager, TableModel
 
 
@@ -30,9 +31,7 @@ class TableView(QTableView):
             if widget is None:
                 widget = VisibleWidget(parent=self.viewport())
                 widget.toggled.connect(
-                    lambda visible, row=row: self._set_row_visibility(
-                        row, visible
-                    )
+                    lambda visible, row=row: self._set_row_visibility(row, visible)
                 )
                 self.setIndexWidget(index, widget)
             object_base = self.table_manager.get_data()[row].obj.obj
@@ -61,9 +60,7 @@ class TableView(QTableView):
                 button.setIcon(get_icon("orbit"))
                 button.setToolTip("Show orbit")
                 button.toggled.connect(
-                    lambda visible, row=row: self._set_shape_visibility(
-                        row, visible
-                    )
+                    lambda visible, row=row: self._set_shape_visibility(row, visible)
                 )
                 self.setIndexWidget(index, button)
             button.blockSignals(True)

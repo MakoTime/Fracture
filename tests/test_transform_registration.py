@@ -1,6 +1,3 @@
-import json
-
-import numpy as np
 import pytest
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
@@ -30,9 +27,7 @@ def test_tree_search_filters_project_objects_and_exposes_blocks():
     transform_root.add_child(transform.node)
     try:
         search = TreeSearch(root_objects.get_nodes())
-        matches = search.find(
-            lambda node: node.node_object is transform
-        )
+        matches = search.find(lambda node: node.node_object is transform)
 
         assert matches == [transform]
         assert transform.node.block_object is transform.block_object
@@ -145,7 +140,9 @@ def test_perlin_dialog_uses_continuous_mode_and_max_amplitude(qapp):
     assert dialog.graph.frequency_max == 20
     assert dialog.graph.amplitude_max == pytest.approx(12.5)
     assert dialog.graph.curve_points[1].y() == pytest.approx(1.0 / 12.5)
-    assert dialog.apply_model().amplitudes[dialog.frequency_count_field.value() // 2] == pytest.approx(1.0)
+    assert dialog.apply_model().amplitudes[
+        dialog.frequency_count_field.value() // 2
+    ] == pytest.approx(1.0)
     dialog.close()
 
 

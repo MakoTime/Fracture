@@ -1,5 +1,8 @@
-from PySide6.QtCore import QPointF
+from itertools import pairwise
+
 import numpy as np
+from PySide6.QtCore import QPointF
+
 
 def _implementation():
     from dialog.perlin_noise_transform.graph import FrequencyAmplitudeGraph
@@ -34,7 +37,11 @@ def evaluate_prepared_bezier(prepared, progress):
         return normalized[0][1] if normalized else 0.0
     progress = max(0.0, min(1.0, float(progress)))
     index = next(
-        (index for index, (_, end) in enumerate(zip(normalized, normalized[1:])) if progress <= end[0]),
+        (
+            index
+            for index, (_, end) in enumerate(pairwise(normalized))
+            if progress <= end[0]
+        ),
         len(normalized) - 2,
     )
     start, end = normalized[index], normalized[index + 1]
@@ -43,8 +50,14 @@ def evaluate_prepared_bezier(prepared, progress):
     control_end = effective[index + 1][0]
     minimum = min(start[1], end[1])
     maximum = max(start[1], end[1])
-    control_start = (max(start[0], min(end[0], control_start[0])), max(minimum, min(maximum, control_start[1])))
-    control_end = (max(start[0], min(end[0], control_end[0])), max(minimum, min(maximum, control_end[1])))
+    control_start = (
+        max(start[0], min(end[0], control_start[0])),
+        max(minimum, min(maximum, control_start[1])),
+    )
+    control_end = (
+        max(start[0], min(end[0], control_end[0])),
+        max(minimum, min(maximum, control_end[1])),
+    )
     inverse = 1.0 - local
     return (
         inverse**3 * start[1]

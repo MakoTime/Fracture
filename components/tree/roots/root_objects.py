@@ -1,8 +1,8 @@
 from ..model import TreeNode
 from .colourmaps import colourmap_root
+from .islands import island_root
 from .mesh import mesh_root
 from .transforms import transform_root
-from .islands import island_root
 
 
 class RootObjects:

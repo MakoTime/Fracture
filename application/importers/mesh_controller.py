@@ -1,15 +1,12 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QDialog, QTabWidget, QTreeView, QWidget
 
+from common.icons import get_icon
 from components.tree import TreeModel, TreeSearch
-from components.tree.roots import root_objects, transform_root
-from components.tree.roots import mesh_root
-from dialog.mesh_edit.factory import create_mesh_edit_dialog
+from components.tree.roots import mesh_root, root_objects, transform_root
 from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
-from dialog.mesh_generate import GenerateMeshWindow
-from dialog.mesh_generate import MeshGenerateModel
+from dialog.mesh_edit.factory import create_mesh_edit_dialog
 from dialog.mesh_filter import MeshFilterModel, create_mesh_filter_dialog
+from dialog.mesh_generate import GenerateMeshWindow, MeshGenerateModel
 from dialog.mesh_import.factory import (
     create_elevation_import_dialog,
     create_mesh_import_dialog,
@@ -21,18 +18,19 @@ from engine import EngineTask
 from engine.block_objects import (
     MeshBlockObject,
     PerlinNoiseTransformBlockObject,
-    ProceduralMeshBlock,
+)
+from engine.block_tasks import (
+    GeneratedMeshTask,
+    MeshFilterTask,
+    PerlinNoiseTransformTask,
+    ProceduralMeshObjectTask,
 )
 from objects.colourmap import ColourmapObject
-from engine.block_tasks import GeneratedMeshTask, MeshFilterTask, MeshImportTask
-from engine.block_tasks import PerlinNoiseTransformTask
-from engine.block_tasks import ProceduralMeshObjectTask
-from objects.mesh_object import MeshObject
 from objects.generated_mesh import GeneratedMesh
-from objects.procedural_mesh import ProceduralMeshObject
+from objects.mesh_object import MeshObject
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
+from objects.procedural_mesh import ProceduralMeshObject
 from tools.dropdown import create_dropdown_menu
-from common.icons import get_icon
 
 from .object_importer import ObjectImporterModel
 
@@ -46,7 +44,7 @@ class MeshImportController:
         self,
         object_importer: ObjectImporterModel,
         tree_view: QTreeView,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         engine_runner=None,
     ):
         self.object_importer = object_importer
@@ -56,13 +54,9 @@ class MeshImportController:
         self.generate_mesh_window = None
         self.generate_procedural_mesh_window = None
         if hasattr(self.tree_view, "add_context_menu_factory"):
-            self.tree_view.add_context_menu_factory(
-                self._create_context_menu_for_index
-            )
+            self.tree_view.add_context_menu_factory(self._create_context_menu_for_index)
         elif hasattr(self.tree_view, "set_context_menu_factory"):
-            self.tree_view.set_context_menu_factory(
-                self._create_context_menu_for_index
-            )
+            self.tree_view.set_context_menu_factory(self._create_context_menu_for_index)
 
     def _create_context_menu_for_index(self, index, parent):
         """Adapt the tree view callback to the mesh menu API."""
@@ -74,7 +68,7 @@ class MeshImportController:
             return lambda name: model.next_name(name, exclude=exclude)
         return lambda name: name
 
-    def import_mesh(self) -> Optional[EngineTask]:
+    def import_mesh(self) -> EngineTask | None:
         """Queue an accepted 3D object mesh import."""
         dialog = create_mesh_import_dialog(
             parent=self.parent,
@@ -88,7 +82,7 @@ class MeshImportController:
             return None
         return self._queue_import(model)
 
-    def import_elevation(self) -> Optional[EngineTask]:
+    def import_elevation(self) -> EngineTask | None:
         """Queue an accepted elevation image import."""
         dialog = create_elevation_import_dialog(
             parent=self.parent,
@@ -126,9 +120,10 @@ class MeshImportController:
                 if self.parent is not None
                 else None
             )
-            if workspace_tabs is not None and workspace_tabs.indexOf(
-                self.generate_mesh_window
-            ) < 0:
+            if (
+                workspace_tabs is not None
+                and workspace_tabs.indexOf(self.generate_mesh_window) < 0
+            ):
                 workspace_tabs.addTab(self.generate_mesh_window, "Generate Mesh")
                 workspace_tabs.setCurrentWidget(self.generate_mesh_window)
             else:
@@ -190,16 +185,15 @@ class MeshImportController:
                 if self.parent is not None
                 else None
             )
-            if workspace_tabs is not None and workspace_tabs.indexOf(
-                self.generate_procedural_mesh_window
-            ) < 0:
+            if (
+                workspace_tabs is not None
+                and workspace_tabs.indexOf(self.generate_procedural_mesh_window) < 0
+            ):
                 workspace_tabs.addTab(
                     self.generate_procedural_mesh_window,
                     "Generate Procedural Mesh",
                 )
-                workspace_tabs.setCurrentWidget(
-                    self.generate_procedural_mesh_window
-                )
+                workspace_tabs.setCurrentWidget(self.generate_procedural_mesh_window)
             else:
                 self.generate_procedural_mesh_window.show()
         return self.generate_procedural_mesh_window
@@ -299,7 +293,9 @@ class MeshImportController:
                 task,
                 on_finished=lambda finished: self._finish_task(filtered_mesh, finished),
             )
-        return self.engine_runner.enqueue_block_task(f"Filter {filtered_mesh.name}", task)
+        return self.engine_runner.enqueue_block_task(
+            f"Filter {filtered_mesh.name}", task
+        )
 
     def _replace_generated_mesh(self, mesh_object, edited_mesh):
         was_visible = mesh_object.visible
@@ -409,8 +405,7 @@ class MeshImportController:
                 (
                     child
                     for child in block.child_block_objects
-                    if isinstance(child, MeshBlockObject)
-                    and child is not block
+                    if isinstance(child, MeshBlockObject) and child is not block
                 ),
                 None,
             )
@@ -488,6 +483,7 @@ class MeshImportController:
             ),
             None,
         )
+
         def apply_colourmap(model):
             model.apply(mesh_object)
             scene = getattr(self.object_importer, "scene_viewer", None)
@@ -506,10 +502,7 @@ class MeshImportController:
             for affected_mesh in affected_meshes:
                 self._sync_mesh_children(affected_mesh)
                 self.object_importer.persist_block(affected_mesh.mesh_block_object)
-                if (
-                    scene is not None
-                    and hasattr(scene, "refresh_object_colourmap")
-                ):
+                if scene is not None and hasattr(scene, "refresh_object_colourmap"):
                     scene.refresh_object_colourmap(affected_mesh)
             tree_model = self.tree_view.model()
             if isinstance(tree_model, TreeModel):
@@ -540,9 +533,8 @@ class MeshImportController:
         workspace_tabs.setCurrentWidget(window)
         return window
 
-    def _queue_import(self, model) -> Optional[EngineTask]:
+    def _queue_import(self, model) -> EngineTask | None:
         """Queue a mesh model and register it after engine processing."""
-
         import_task = model.to_mesh_import_task()
 
         def finish_import(task):
@@ -551,9 +543,7 @@ class MeshImportController:
             self.object_importer.persist_block(import_task.block_object)
             if not model.add_to_scene:
                 import_task.block_object.release()
-            mesh_object = model.to_mesh_object(
-                import_task.block_object
-            )
+            mesh_object = model.to_mesh_object(import_task.block_object)
             if model.add_to_scene:
                 mesh_object.set_visible(True)
             self.object_importer.register(
@@ -580,7 +570,7 @@ class MeshImportController:
             on_finished=finish_import,
         )
 
-    def create_context_menu(self, node, parent: Optional[QWidget] = None):
+    def create_context_menu(self, node, parent: QWidget | None = None):
         """Create actions appropriate for a tree node."""
         options = []
         if node is mesh_root:

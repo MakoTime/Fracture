@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import QMenu, QTreeView
@@ -14,7 +14,7 @@ class TreeView(QTreeView):
         self.setRootIsDecorated(True)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
-        self._context_menu_factory: Optional[Callable] = None
+        self._context_menu_factory: Callable | None = None
         self._context_menu_factories = []
         self.expanded.connect(self._on_expanded)
         self.collapsed.connect(self._on_collapsed)
@@ -29,7 +29,7 @@ class TreeView(QTreeView):
         if hasattr(model, "set_expanded"):
             model.set_expanded(index, False)
 
-    def set_context_menu_factory(self, factory: Optional[Callable]):
+    def set_context_menu_factory(self, factory: Callable | None):
         """Set a callback that builds a menu for a clicked tree index."""
         self._context_menu_factory = factory
         self._context_menu_factories = [factory] if factory is not None else []

@@ -33,14 +33,10 @@ class TransformBlockObject(BlockObject, ABC):
         """Return transformed values without mutating the input array."""
 
     def serialise(self, path):
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement serialise()"
-        )
+        raise NotImplementedError(f"{type(self).__name__} must implement serialise()")
 
     save = serialise
 
     @classmethod
     def load(cls, path: str | Path, **kwargs):
-        raise NotImplementedError(
-            f"{type(cls).__name__} must implement load()"
-        )
+        raise NotImplementedError(f"{type(cls).__name__} must implement load()")

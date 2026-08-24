@@ -1,10 +1,10 @@
 from PySide6.QtCore import QDate, QDateTime, QTime, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
-    QHBoxLayout,
-    QGroupBox,
-    QLabel,
     QDateEdit,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QTimeEdit,
     QVBoxLayout,
     QWidget,
@@ -157,9 +157,11 @@ class WorldStateView(QWidget):
         self.time_spinbox.setTime(interpolated.time())
         self._last_datetime = interpolated
         if self.timer_controller is not None:
-            elapsed_delta = (duration / 1000) * (
-                self._interpolation_elapsed - previous_elapsed
-            ) / 1000
+            elapsed_delta = (
+                (duration / 1000)
+                * (self._interpolation_elapsed - previous_elapsed)
+                / 1000
+            )
             self.timer_controller.advance(elapsed_delta)
         if progress >= 1.0:
             self._reset_interpolation()

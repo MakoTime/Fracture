@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from PySide6.QtGui import QPixmap
 
@@ -10,4 +9,4 @@ class NotifyModel:
 
     title: str
     content: str
-    icon: Optional[QPixmap] = None
+    icon: QPixmap | None = None

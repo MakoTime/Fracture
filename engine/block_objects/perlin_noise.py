@@ -1,7 +1,6 @@
-from dataclasses import dataclass, field
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 
@@ -187,7 +186,7 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
                     "comments": self.comments,
                     "frequencies": list(self.frequencies),
                     "amplitudes": list(self.amplitudes),
-                            "max_amplitude": self.max_amplitude,
+                    "max_amplitude": self.max_amplitude,
                     "seed": self.seed,
                     "curve_mode": self.curve_mode,
                     "curve_points": [list(point) for point in self.curve_points],
@@ -213,7 +212,9 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
     save = serialise
 
     def serialise_to_directory(self, directory):
-        return self.serialise(Path(directory) / f"{self.guid}.perlin_noise_transform.json")
+        return self.serialise(
+            Path(directory) / f"{self.guid}.perlin_noise_transform.json"
+        )
 
     def noise_field(self, dimensions):
         """Build a normalized field from this transform's frequency bands."""
@@ -229,11 +230,14 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
         for index, (frequency, amplitude) in enumerate(
             zip(prepared.frequencies, prepared.amplitudes)
         ):
-            field += self._build_perlin_noise(
-                dimensions,
-                frequency,
-                prepared.seed + index,
-            ) * amplitude
+            field += (
+                self._build_perlin_noise(
+                    dimensions,
+                    frequency,
+                    prepared.seed + index,
+                )
+                * amplitude
+            )
         return field / total_amplitude
 
     @staticmethod
@@ -277,18 +281,15 @@ class PerlinNoiseTransformBlockObject(TransformBlockObject):
 
         corners = {
             offsets: dot_gradient(offsets)
-            for offsets in (
-                (x, y, z)
-                for x in (0, 1)
-                for y in (0, 1)
-                for z in (0, 1)
-            )
+            for offsets in ((x, y, z) for x in (0, 1) for y in (0, 1) for z in (0, 1))
         }
         x_amount, y_amount, z_amount = (fade(fraction) for fraction in fractions)
         x_layers = {}
         for y_offset in (0, 1):
             for z_offset in (0, 1):
-                x_layers[y_offset, z_offset] = corners[0, y_offset, z_offset] + x_amount * (
+                x_layers[y_offset, z_offset] = corners[
+                    0, y_offset, z_offset
+                ] + x_amount * (
                     corners[1, y_offset, z_offset] - corners[0, y_offset, z_offset]
                 )
         y_layers = {}

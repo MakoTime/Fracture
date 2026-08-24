@@ -1,6 +1,6 @@
-from objects.object_base import ObjectBase, ViewableMixin
 from components.tree import TreeSearch
 from dialog.notify import create_notification
+from objects.object_base import ObjectBase, ViewableMixin
 
 from .registry import ImportBindingRegistry
 
@@ -56,6 +56,7 @@ class ObjectImporterModel:
         if block is not None and not hasattr(
             object_base, "_importer_destruction_callback"
         ):
+
             def remove_table_row(_block):
                 self.table_model.remove_object(object_base)
 

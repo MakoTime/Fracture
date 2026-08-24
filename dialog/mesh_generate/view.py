@@ -1,36 +1,32 @@
-from PySide6.QtCore import QTimer, QSize, Qt, Signal
+from contextlib import contextmanager
+
+import numpy as np
+import pyvista as pv
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QCheckBox,
     QLabel,
     QPushButton,
-    QSplitter,
     QSlider,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
-from tools.widgets import (
-    IntegerVector3Widget,
-    NameField,
-    NormalizedSpinBox,
-    VisibleWidget,
-)
-
-
-import numpy as np
-import pyvista as pv
 
 from components.scene import SceneViewer
 from dialog.base.tab_editor import TabEditorView
+from dialog.mesh_mask import create_surface_mask_dialog
+from tools.widgets import (
+    IntegerVector3Widget,
+    NameField,
+    VisibleWidget,
+)
 
 from .model import MeshGenerateModel
-from dialog.mesh_mask import create_surface_mask_dialog
-
-
-from contextlib import contextmanager
 
 
 class GenerateMeshWindow(TabEditorView):
@@ -40,7 +36,9 @@ class GenerateMeshWindow(TabEditorView):
     GRID_POINT_SIZE_MAX = 9.0
     GRID_POINT_SIZE_REFERENCE_COUNT = 1_000
 
-    def __init__(self, parent=None, model=None, on_apply=None, tree_search=None, deduper=None):
+    def __init__(
+        self, parent=None, model=None, on_apply=None, tree_search=None, deduper=None
+    ):
         TabEditorView.__init__(
             self,
             model or MeshGenerateModel(),
@@ -105,7 +103,9 @@ class GenerateMeshWindow(TabEditorView):
         self.mask_buttons = {}
         for axis in "XYZ":
             button = QPushButton(f"Configure {axis} mask")
-            button.clicked.connect(lambda checked=False, axis=axis: self._edit_mask(axis))
+            button.clicked.connect(
+                lambda checked=False, axis=axis: self._edit_mask(axis)
+            )
             self.mask_buttons[axis] = button
             mask_form.addRow(f"{axis} surface", button)
         self.show_mask_surface = VisibleWidget(self.model.show_mask_surface)
@@ -113,7 +113,9 @@ class GenerateMeshWindow(TabEditorView):
         self.show_mask_surface.toggled.connect(self._update_preview)
         self.flexible_masks = QCheckBox("Flexible")
         self.flexible_masks.setChecked(self.model.flexible_masks)
-        self.flexible_masks.setAccessibleName("Allow surface masks to resize with the grid")
+        self.flexible_masks.setAccessibleName(
+            "Allow surface masks to resize with the grid"
+        )
         self.flexible_masks.toggled.connect(self._set_masks_flexible)
         mask_visibility_row = QHBoxLayout()
         mask_visibility_row.addWidget(self.show_mask_surface)
@@ -169,7 +171,7 @@ class GenerateMeshWindow(TabEditorView):
         """Zoom after the initial generated grid has been fitted."""
         if self._preview_ready and self.isVisible():
             self.preview.zoom_camera(0.65)
-        
+
     @contextmanager
     def change_camera(self):
         self._reset_camera = True
@@ -247,9 +249,7 @@ class GenerateMeshWindow(TabEditorView):
     def _adaptive_grid_point_size(cls, point_count):
         if point_count < 1:
             return cls.GRID_POINT_SIZE_MAX
-        size = 7.0 * (
-            cls.GRID_POINT_SIZE_REFERENCE_COUNT / point_count
-        ) ** (1 / 3)
+        size = 7.0 * (cls.GRID_POINT_SIZE_REFERENCE_COUNT / point_count) ** (1 / 3)
         return float(
             np.clip(
                 size,
@@ -311,4 +311,3 @@ class GenerateMeshWindow(TabEditorView):
         rows = np.linspace(0, values.shape[0] - 1, shape[0]).round().astype(int)
         columns = np.linspace(0, values.shape[1] - 1, shape[1]).round().astype(int)
         return values[np.ix_(rows, columns)]
-

@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -8,10 +9,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import QTimer, Qt
 
 from components.scene import SceneViewer
 from dialog.base.tab_editor import TabEditorView
+
 from .model import MeshColourmapModel
 
 

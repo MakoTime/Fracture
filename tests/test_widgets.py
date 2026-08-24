@@ -1,6 +1,13 @@
 from PySide6.QtCore import QDate, QDateTime, QTime
 
+from components.table import TableManager, TableView
+from components.world_state import WorldStateView
+from dialog.mesh_import.model import MeshImportModel
+from dialog.mesh_import.view import MeshImportView
+from objects.mesh_object import MeshObject
+from tests.viewable_test_object import ViewableTestObject
 from tools.widgets import (
+    DynamicSpinbox,
     FastForwardWidget,
     MediaControlsWidget,
     NormalizedSpinBox,
@@ -8,14 +15,6 @@ from tools.widgets import (
     RewindWidget,
     VisibleWidget,
 )
-from components.table import TableManager, TableView
-from dialog.mesh_import.model import MeshImportModel
-from dialog.mesh_import.view import MeshImportView
-from components.world_state import WorldStateView
-from tools.widgets import DynamicSpinbox
-from objects.object_base import ObjectBase
-from tests.viewable_test_object import ViewableTestObject
-from objects.mesh_object import MeshObject
 
 
 def test_visible_widget_starts_with_invisible_state(qapp):
@@ -122,7 +121,9 @@ def test_world_state_view_has_time_above_date(qapp):
 
     assert view.time_spinbox.displayFormat() == "HH:mm:ss"
     assert view.date_spinbox.displayFormat() == "yyyy-MM-dd"
-    assert [view.rate_combo.itemData(index) for index in range(view.rate_combo.count())] == [
+    assert [
+        view.rate_combo.itemData(index) for index in range(view.rate_combo.count())
+    ] == [
         "seconds",
         "minutes",
         "hours",

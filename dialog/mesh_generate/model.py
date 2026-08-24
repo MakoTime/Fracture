@@ -2,10 +2,11 @@ from dataclasses import dataclass, field
 from uuid import uuid4
 
 import numpy as np
-from objects.generated_mesh import GeneratedMesh
-from engine.block_tasks import MeshGenerateTask
-from dialog.perlin_noise_transform import PerlinNoiseTransformModel
+
 from dialog.base.editor import EditorModel
+from dialog.perlin_noise_transform import PerlinNoiseTransformModel
+from engine.block_tasks import MeshGenerateTask
+from objects.generated_mesh import GeneratedMesh
 
 
 @dataclass
@@ -58,7 +59,7 @@ class MeshGenerateModel(EditorModel):
         return cls(**settings)
 
     def generate(self) -> GeneratedMesh:
-        """Synchronously run the generation block task."""
+        """Run the generation block task synchronously."""
         task = self.to_mesh_generate_task()
         prepared = task.prepare()
         block_object = task.execute(prepared)

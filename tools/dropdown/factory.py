@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from PySide6.QtWidgets import QMenu, QWidget
 
@@ -9,14 +9,14 @@ from .view import DropdownView
 def create_dropdown(
     options: Iterable,
     current_value=None,
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
 ) -> DropdownView:
     """Build a dropdown from labels, pairs, or DropdownOption values."""
     model = DropdownModel.from_options(options, current_value)
     return DropdownView(model, parent=parent)
 
 
-def create_dropdown_menu(options: Iterable, parent: Optional[QWidget] = None) -> QMenu:
+def create_dropdown_menu(options: Iterable, parent: QWidget | None = None) -> QMenu:
     """Build a context-style dropdown menu from label/callback pairs."""
     menu = QMenu(parent)
     for option in options:

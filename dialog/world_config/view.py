@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QFormLayout, QVBoxLayout
 
 from dialog.base.popup_editor import PopupEditorView
-from tools.widgets.vector import Vector3Widget
 from tools.widgets import NameField
+from tools.widgets.vector import Vector3Widget
 
 from .model import WorldConfigModel
 

@@ -1,6 +1,6 @@
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-import shutil
 from typing import Any
 from uuid import uuid4
 
@@ -19,7 +19,9 @@ class MeshBlockObject(BlockObject):
     guid: str = field(default_factory=lambda: str(uuid4()))
     comments: str = ""
     serialised_path: Path | None = field(default=None, repr=False, compare=False)
-    colourmap: ColourmapBlockObject | None = field(default=None, repr=False, compare=False)
+    colourmap: ColourmapBlockObject | None = field(
+        default=None, repr=False, compare=False
+    )
     colourmap_field_sources: tuple[str, str] = field(
         default=("elevation", "normal_z"), repr=False
     )
@@ -40,9 +42,7 @@ class MeshBlockObject(BlockObject):
             raise TypeError("colourmap must be a ColourmapBlockObject")
         if self.colourmap is not None:
             self.remove_change_child_block_object(self.colourmap)
-            self.colourmap.remove_destruction_callback(
-                self._on_colourmap_destroyed
-            )
+            self.colourmap.remove_destruction_callback(self._on_colourmap_destroyed)
         self.colourmap = colourmap
         if colourmap is not None:
             self.add_change_child_block_object(colourmap)
@@ -152,7 +152,6 @@ class MeshBlockObject(BlockObject):
             comments=comments,
             serialised_path=payload_path,
         )
-
 
     @property
     def scene_data(self):

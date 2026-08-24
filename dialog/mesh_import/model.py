@@ -1,13 +1,12 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
+from application.importers import register_import_binding
 from engine.block_objects import MeshBlockObject
 from engine.block_tasks import MeshImportTask
 from objects.mesh_object import MeshObject
-from application.importers import register_import_binding
-
 
 Vector3 = tuple[float, float, float]
 
@@ -23,7 +22,7 @@ class MeshImportModel:
     scale: Vector3 = (1.0, 1.0, 1.0)
     rotation: Vector3 = (0.0, 0.0, 0.0)
     offset: Vector3 = (0.0, 0.0, 0.0)
-    mesh_data: Optional[Any] = None
+    mesh_data: Any | None = None
     add_to_scene: bool = False
     low_threshold: float = 0.0
     high_threshold: float = 255.0

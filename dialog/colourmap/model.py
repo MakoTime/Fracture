@@ -48,7 +48,9 @@ class ColourmapModel:
     def _normalize_positions(positions):
         values = tuple(sorted(float(value) for value in positions))
         if len(values) < 2 or values[0] < 0.0 or values[-1] > 1.0:
-            raise ValueError("Each colourmap field requires at least two positions between 0 and 1")
+            raise ValueError(
+                "Each colourmap field requires at least two positions between 0 and 1"
+            )
         if len(set(values)) != len(values):
             raise ValueError("Colourmap field positions must be unique")
         return values
@@ -56,7 +58,10 @@ class ColourmapModel:
     def _grid_from_stops(self, stops):
         colours = tuple(colour for _, colour in stops)
         return tuple(
-            tuple(colours[index % len(colours)] for index in range(len(self.field1_positions)))
+            tuple(
+                colours[index % len(colours)]
+                for index in range(len(self.field1_positions))
+            )
             for _ in self.field2_positions
         )
 
@@ -64,7 +69,9 @@ class ColourmapModel:
         if len(grid) != len(self.field2_positions) or any(
             len(row) != len(self.field1_positions) for row in grid
         ):
-            raise ValueError("Colourmap colour grid must match both field position lists")
+            raise ValueError(
+                "Colourmap colour grid must match both field position lists"
+            )
         normalized = []
         for row in grid:
             normalized_row = []
@@ -72,8 +79,12 @@ class ColourmapModel:
                 rgba = tuple(float(channel) for channel in colour)
                 if len(rgba) == 3:
                     rgba += (1.0,)
-                if len(rgba) != 4 or any(channel < 0.0 or channel > 1.0 for channel in rgba):
-                    raise ValueError("Colourmap colours must be RGB or RGBA values between 0 and 1")
+                if len(rgba) != 4 or any(
+                    channel < 0.0 or channel > 1.0 for channel in rgba
+                ):
+                    raise ValueError(
+                        "Colourmap colours must be RGB or RGBA values between 0 and 1"
+                    )
                 normalized_row.append(rgba)
             normalized.append(tuple(normalized_row))
         return tuple(normalized)
@@ -116,9 +127,13 @@ class ColourmapModel:
             field1_positions=getattr(block, "field1_positions", (0.0, 1.0)),
             field2_positions=getattr(block, "field2_positions", (0.0, 1.0)),
             colour_grid=getattr(block, "colour_grid", ()),
-            field1_curve_points=getattr(block, "field1_curve_points", ((0.0, 0.0), (1.0, 1.0))),
+            field1_curve_points=getattr(
+                block, "field1_curve_points", ((0.0, 0.0), (1.0, 1.0))
+            ),
             field1_curve_handles=getattr(block, "field1_curve_handles", (None, None)),
-            field2_curve_points=getattr(block, "field2_curve_points", ((0.0, 0.0), (1.0, 1.0))),
+            field2_curve_points=getattr(
+                block, "field2_curve_points", ((0.0, 0.0), (1.0, 1.0))
+            ),
             field2_curve_handles=getattr(block, "field2_curve_handles", (None, None)),
             comments=block.comments,
             field1_name=getattr(block, "field1_name", "Field 1"),
@@ -147,9 +162,15 @@ class ColourmapModel:
                 tuple(tuple(colour) for colour in row)
                 for row in data.get("colour_grid", ())
             ),
-            field1_curve_points=tuple(tuple(point) for point in data.get("field1_curve_points", ((0.0, 0.0), (1.0, 1.0)))),
+            field1_curve_points=tuple(
+                tuple(point)
+                for point in data.get("field1_curve_points", ((0.0, 0.0), (1.0, 1.0)))
+            ),
             field1_curve_handles=tuple(data.get("field1_curve_handles", (None, None))),
-            field2_curve_points=tuple(tuple(point) for point in data.get("field2_curve_points", ((0.0, 0.0), (1.0, 1.0)))),
+            field2_curve_points=tuple(
+                tuple(point)
+                for point in data.get("field2_curve_points", ((0.0, 0.0), (1.0, 1.0)))
+            ),
             field2_curve_handles=tuple(data.get("field2_curve_handles", (None, None))),
         )
 
@@ -166,7 +187,11 @@ class ColourmapModel:
                 None
                 if self.perlin_noise_transform is None
                 else getattr(
-                    getattr(self.perlin_noise_transform, "block_object", self.perlin_noise_transform),
+                    getattr(
+                        self.perlin_noise_transform,
+                        "block_object",
+                        self.perlin_noise_transform,
+                    ),
                     "guid",
                     None,
                 )

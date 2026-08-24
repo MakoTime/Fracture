@@ -3,9 +3,9 @@ from dataclasses import dataclass
 import numpy as np
 import pyvista as pv
 
-from engine.block_objects import ColourmapBlockObject
-from engine.block_objects import PerlinNoiseTransformBlockObject
+from engine.block_objects import ColourmapBlockObject, PerlinNoiseTransformBlockObject
 from objects.mesh_object import MeshObject
+
 
 @dataclass
 class MeshColourmapModel:
@@ -87,7 +87,9 @@ class MeshColourmapModel:
                 split_vertices=False,
                 inplace=False,
             )
-        elif hasattr(payload, "compute_normals") and "Normals" not in payload.point_data:
+        elif (
+            hasattr(payload, "compute_normals") and "Normals" not in payload.point_data
+        ):
             payload = payload.compute_normals(
                 auto_orient_normals=True,
                 split_vertices=False,
@@ -100,7 +102,9 @@ class MeshColourmapModel:
 
         points = np.asarray(payload.points)
         elevation = points[:, 2]
-        elevation_span = float(elevation.max() - elevation.min()) if len(elevation) else 0.0
+        elevation_span = (
+            float(elevation.max() - elevation.min()) if len(elevation) else 0.0
+        )
         relative_elevation = (
             np.zeros_like(elevation)
             if elevation_span <= 1e-12
@@ -120,9 +124,7 @@ class MeshColourmapModel:
             second_field = 1.0 - second_field
         copied_colourmap = self._copy_colourmap(colourmap)
         payload.point_data["__colourmap_rgba"] = np.clip(
-            np.round(
-                copied_colourmap.apply_fields(first_field, second_field) * 255.0
-            ),
+            np.round(copied_colourmap.apply_fields(first_field, second_field) * 255.0),
             0,
             255,
         ).astype(np.uint8)

@@ -1,48 +1,54 @@
+from itertools import pairwise
 from types import SimpleNamespace
 
 import numpy as np
 import pyvista as pv
-from PySide6.QtCore import QEventLoop, QTimer, Qt
+from PySide6.QtCore import QEventLoop, Qt, QTimer
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QWidget
 
-from components.table import TableManager, TableModel
+from application.importers import (
+    ColourmapController,
+    MeshImportController,
+    ObjectImporterModel,
+    TransformController,
+)
+from application.importers.island_controller import IslandController
+from application.importers.world_config_controller import WorldConfigController
+from components.scene import ShapeController
+from components.table import TableManager, TableModel, TableView
 from components.tree import TreeModel
 from components.tree.roots import (
     colourmap_root,
     island_root,
     mesh_root,
     root_objects,
-    transform_root,
     world_config,
 )
-from dialog.mesh_import.model import MeshImportModel
+from dialog.mesh_edit.model import MeshEditModel
+from dialog.mesh_filter import MeshFilterModel
 from dialog.mesh_generate import GenerateMeshWindow, MeshGenerateModel
+from dialog.mesh_import.model import MeshImportModel
 from dialog.mesh_mask import SurfaceMaskModel
 from dialog.mesh_mask.view import MaskCanvas
-from dialog.mesh_edit.model import MeshEditModel
-from engine.block_objects import IslandBlockObject, MeshBlockObject
-from engine.block_tasks import MeshImportTask
-from engine.block_tasks import IslandTask
-from engine.block_tasks import MeshGenerateTask
-from engine.block_tasks import MeshFilterTask
-from engine.block_tasks.generated_mesh import GeneratedMeshTask
-from engine.block_objects import GeneratedMeshBlockObject
-from objects.mesh_object import MeshObject
-from objects.island import Island
-from objects.generated_mesh import GeneratedMesh
-from application.importers import MeshImportController, ObjectImporterModel
-from application.importers import TransformController
-from application.importers import ColourmapController
-from application.importers.world_config_controller import WorldConfigController
-from application.importers.island_controller import IslandController
 from dialog.perlin_noise_transform import PerlinNoiseTransformModel
-from dialog.mesh_filter import MeshFilterModel
-from objects.perlin_noise_transform import PerlinNoiseTransformObject
+from engine.block_objects import (
+    GeneratedMeshBlockObject,
+    IslandBlockObject,
+    MeshBlockObject,
+)
+from engine.block_tasks import (
+    IslandTask,
+    MeshFilterTask,
+    MeshGenerateTask,
+    MeshImportTask,
+)
+from engine.block_tasks.generated_mesh import GeneratedMeshTask
+from objects.generated_mesh import GeneratedMesh
+from objects.island import Island
+from objects.mesh_object import MeshObject
 from objects.object_base import ObjectBase
 from tests.viewable_test_object import ViewableTestObject
-from components.scene import ShapeController
-from components.table import TableManager, TableModel, TableView
 
 
 def _perlin_transform(size=4, seed=0, amplitude=1.0):
@@ -405,21 +411,33 @@ def test_mesh_generate_transform_frequency_and_penetration_change_mesh_shape():
         noise_enabled=True,
         x_mask=mask,
     )
-    low_frequency = MeshGenerateModel(
-        **base_settings,
-        perlin_noise_transform=_perlin_transform(size=2, seed=11),
-        noise_penetration=1,
-    ).generate().mesh_data
-    high_frequency = MeshGenerateModel(
-        **base_settings,
-        perlin_noise_transform=_perlin_transform(size=8, seed=11),
-        noise_penetration=1,
-    ).generate().mesh_data
-    deep_penetration = MeshGenerateModel(
-        **base_settings,
-        perlin_noise_transform=_perlin_transform(seed=11),
-        noise_penetration=6,
-    ).generate().mesh_data
+    low_frequency = (
+        MeshGenerateModel(
+            **base_settings,
+            perlin_noise_transform=_perlin_transform(size=2, seed=11),
+            noise_penetration=1,
+        )
+        .generate()
+        .mesh_data
+    )
+    high_frequency = (
+        MeshGenerateModel(
+            **base_settings,
+            perlin_noise_transform=_perlin_transform(size=8, seed=11),
+            noise_penetration=1,
+        )
+        .generate()
+        .mesh_data
+    )
+    deep_penetration = (
+        MeshGenerateModel(
+            **base_settings,
+            perlin_noise_transform=_perlin_transform(seed=11),
+            noise_penetration=6,
+        )
+        .generate()
+        .mesh_data
+    )
 
     assert not np.array_equal(low_frequency.points, high_frequency.points)
     assert deep_penetration.n_points != high_frequency.n_points
@@ -570,7 +588,7 @@ def test_surface_mask_drag_interpolation_fills_skipped_cells():
     assert len(cells) == 9
     assert all(
         max(abs(next_row - row), abs(next_column - column)) <= 1
-        for (row, column), (next_row, next_column) in zip(cells, cells[1:])
+        for (row, column), (next_row, next_column) in pairwise(cells)
     )
 
 
@@ -695,9 +713,7 @@ def test_mesh_filter_surface_displacement_modifies_the_marching_cubes_grid():
         grid_data=np.random.default_rng(4).random((8, 8, 8)),
     )
     transform = _perlin_transform(size=4, seed=9)
-    transform.block_object.update_configuration(
-        application_mode="surface_displacement"
-    )
+    transform.block_object.update_configuration(application_mode="surface_displacement")
     task = MeshFilterTask(
         source.mesh_block_object,
         transform.block_object,
@@ -770,7 +786,10 @@ def test_generated_mesh_transform_setter_keeps_same_transform_child():
     )
     block.validate()
 
-    assert block.set_perlin_noise_transform(transform.block_object) is transform.block_object
+    assert (
+        block.set_perlin_noise_transform(transform.block_object)
+        is transform.block_object
+    )
     assert block.is_valid()
     assert transform.block_object in block.child_block_objects
 
@@ -938,10 +957,13 @@ def test_tree_and_table_read_mesh_identity_from_block(qapp):
     root_index = tree_model.index(root_objects.get_nodes().index(mesh_root), 0)
     mesh_index = tree_model.index(0, 0, root_index)
     assert tree_model.data(mesh_index, Qt.DisplayRole) == "Block name"
-    assert table_model.data(
-        table_model.index(0, table_model.NAME),
-        Qt.DisplayRole,
-    ) == "Block name"
+    assert (
+        table_model.data(
+            table_model.index(0, table_model.NAME),
+            Qt.DisplayRole,
+        )
+        == "Block name"
+    )
     assert mesh_object.name == "Block name"
     assert mesh_object.guid == "block-guid"
 
@@ -964,10 +986,13 @@ def test_table_model_exposes_rows_added_after_view_creation(qapp):
     table_model.add_row(object_base.row_data)
 
     assert table_model.rowCount() == 1
-    assert table_model.data(
-        table_model.index(0, table_model.NAME),
-        Qt.DisplayRole,
-    ) == "Live Row"
+    assert (
+        table_model.data(
+            table_model.index(0, table_model.NAME),
+            Qt.DisplayRole,
+        )
+        == "Live Row"
+    )
 
 
 def test_table_visibility_controls_scene_actor(qapp):
@@ -989,7 +1014,9 @@ def test_table_visibility_controls_scene_actor(qapp):
     table_model.add_row(object_base.row_data)
 
     visible_index = table_model.index(0, table_model.VISIBLE)
-    assert table_model.setData(visible_index, Qt.CheckState.Unchecked, Qt.CheckStateRole)
+    assert table_model.setData(
+        visible_index, Qt.CheckState.Unchecked, Qt.CheckStateRole
+    )
     assert object_base.visible is False
     assert scene.visibility_changes == [(object_base, False)]
 
@@ -1032,10 +1059,13 @@ def test_shape_controller_attaches_table_interface_and_owns_shapes():
     shape = object_base.shape_interface.add_line([(0, 0, 0), (1, 0, 0)])
 
     assert TableModel.Headers[TableModel.SHAPES] == "Shapes"
-    assert table_model.data(
-        table_model.index(0, TableModel.SHAPES),
-        Qt.DisplayRole,
-    ) is object_base.shape_interface
+    assert (
+        table_model.data(
+            table_model.index(0, TableModel.SHAPES),
+            Qt.DisplayRole,
+        )
+        is object_base.shape_interface
+    )
     assert object_base.row_data.other is object_base.shape_interface
     assert object_base.shape_interface.shapes == (shape,)
     assert str(object_base.shape_interface) == "Shapes (1)"
@@ -1047,10 +1077,15 @@ def test_shape_controller_attaches_table_interface_and_owns_shapes():
 
 
 def test_island_registers_orbit_shape_with_orbit_icon_button(qapp):
-    from components.tree import TreeManager
-    from engine.block_objects import IslandBlockObject, MeshBlockObject, WorldConfigBlockObject
-    from objects.island import Island
     import pyvista as pv
+
+    from components.tree import TreeManager
+    from engine.block_objects import (
+        IslandBlockObject,
+        MeshBlockObject,
+        WorldConfigBlockObject,
+    )
+    from objects.island import Island
 
     class FakeScene:
         def add_object(self, object_base):
@@ -1086,7 +1121,9 @@ def test_island_registers_orbit_shape_with_orbit_icon_button(qapp):
             core_offset=5.0,
         )
     )
-    island.block_object.commit(island.block_object.process(island.block_object.prepare()))
+    island.block_object.commit(
+        island.block_object.process(island.block_object.prepare())
+    )
     importer.register(island)
     table = TableView(table_manager=table_manager)
 
@@ -1103,9 +1140,14 @@ def test_island_registers_orbit_shape_with_orbit_icon_button(qapp):
 
 def test_scene_uses_unique_actor_names_for_multiple_islands():
     import pyvista as pv
-    from engine.block_objects import IslandBlockObject, MeshBlockObject, WorldConfigBlockObject
-    from objects.island import Island
+
     from components.scene.view import SceneViewer
+    from engine.block_objects import (
+        IslandBlockObject,
+        MeshBlockObject,
+        WorldConfigBlockObject,
+    )
+    from objects.island import Island
 
     class FakeActor:
         def SetVisibility(self, visible):

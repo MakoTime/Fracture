@@ -2,8 +2,8 @@ import json
 import math
 
 from PySide6.QtWidgets import (
-    QComboBox,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
@@ -15,16 +15,23 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from tools.widgets import BezierCurveGraph, NameField
-from .model import PerlinNoiseTransformModel
-from tools.widgets import DynamicSpinbox
 from dialog.base.popup_editor import PopupEditorView
+from tools.widgets import BezierCurveGraph, DynamicSpinbox, NameField
+
+from .model import PerlinNoiseTransformModel
 
 
 class PerlinNoiseTransformView(PopupEditorView):
     """Editor for discrete Perlin bands and sampled continuous curves."""
 
-    PRESETS = ("Manual", "Impulse", "Flat bar", "Sin wave", "Cos wave", "Normal distribution")
+    PRESETS = (
+        "Manual",
+        "Impulse",
+        "Flat bar",
+        "Sin wave",
+        "Cos wave",
+        "Normal distribution",
+    )
 
     def __init__(self, model=None, parent=None, deduper=None):
         PopupEditorView.__init__(
@@ -40,12 +47,16 @@ class PerlinNoiseTransformView(PopupEditorView):
         frequency_minimum = (
             min(self.model.frequencies)
             if curve_range and len(self.model.frequencies) > 1
-            else (1 if len(self.model.frequencies) == 1 else min(self.model.frequencies))
+            else (
+                1 if len(self.model.frequencies) == 1 else min(self.model.frequencies)
+            )
         )
         frequency_maximum = (
             max(self.model.frequencies)
             if curve_range and len(self.model.frequencies) > 1
-            else (8 if len(self.model.frequencies) == 1 else max(self.model.frequencies))
+            else (
+                8 if len(self.model.frequencies) == 1 else max(self.model.frequencies)
+            )
         )
         self.frequency_min_field = QSpinBox()
         self.frequency_min_field.setRange(1, 100000)
@@ -58,7 +69,11 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.frequency_count_field.setValue(
             self.model.sample_count
             if curve_range and self.model.manual_sampling
-            else (2 * round(frequency_maximum) + 1 if curve_range else len(self.model.frequencies))
+            else (
+                2 * round(frequency_maximum) + 1
+                if curve_range
+                else len(self.model.frequencies)
+            )
         )
         self.frequency_count_label = QLabel("Frequency count")
         self.manual_sampling_field = QCheckBox("Manual sampling")
@@ -67,7 +82,9 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.max_amplitude_field.setRange(0.0, 100000.0)
         self.max_amplitude_field.setDecimals(3)
         self.max_amplitude_field.setValue(self.model.max_amplitude)
-        self.amplitude_field = QLineEdit(", ".join(str(value) for value in self.model.amplitudes))
+        self.amplitude_field = QLineEdit(
+            ", ".join(str(value) for value in self.model.amplitudes)
+        )
         self.amplitude_field.setVisible(False)
         self.seed_field = QSpinBox()
         self.seed_field.setRange(-2147483648, 2147483647)
@@ -109,9 +126,12 @@ class PerlinNoiseTransformView(PopupEditorView):
             self.graph.curve_points = [(0.0, 0.0), (0.5, 1.0), (1.0, 0.0)]
         if curve_range:
             if len(self.model.frequencies) == 1:
-                self.graph.amplitudes = list(self.model.amplitudes[:self.frequency_count_field.value()])
+                self.graph.amplitudes = list(
+                    self.model.amplitudes[: self.frequency_count_field.value()]
+                )
                 self.graph.amplitudes.extend(
-                    [0.0] * (self.frequency_count_field.value() - len(self.graph.amplitudes))
+                    [0.0]
+                    * (self.frequency_count_field.value() - len(self.graph.amplitudes))
                 )
             if len(self.model.frequencies) == 1:
                 self.amplitude_field.setText(
@@ -119,7 +139,9 @@ class PerlinNoiseTransformView(PopupEditorView):
                 )
         self.graph.values_changed.connect(self._sync_graph_fields)
         self.mode_field.currentIndexChanged.connect(self._mode_changed)
-        self.frequency_count_field.valueChanged.connect(self._frequency_count_spin_changed)
+        self.frequency_count_field.valueChanged.connect(
+            self._frequency_count_spin_changed
+        )
         self.frequency_min_field.valueChanged.connect(self._frequency_range_changed)
         self.frequency_max_field.valueChanged.connect(self._frequency_range_changed)
         self.manual_sampling_field.toggled.connect(self._manual_sampling_changed)
@@ -151,7 +173,9 @@ class PerlinNoiseTransformView(PopupEditorView):
             "background: palette(base); }"
         )
         self.graph.mouse_position_changed.connect(self._update_graph_position)
-        graph_layout.addWidget(QLabel("Drag bars or curve points vertically to set amplitude."))
+        graph_layout.addWidget(
+            QLabel("Drag bars or curve points vertically to set amplitude.")
+        )
         graph_layout.addWidget(self.graph_position_label)
         graph_layout.addWidget(self._options_widget())
 
@@ -173,8 +197,7 @@ class PerlinNoiseTransformView(PopupEditorView):
     def _display_curve_points(self):
         maximum = max(self.model.max_amplitude, 0.0001)
         return tuple(
-            (x, max(0.0, min(1.0, y / maximum)))
-            for x, y in self.model.curve_points
+            (x, max(0.0, min(1.0, y / maximum))) for x, y in self.model.curve_points
         )
 
     def _display_curve_handles(self):
@@ -182,10 +205,7 @@ class PerlinNoiseTransformView(PopupEditorView):
         return tuple(
             None
             if handles is None
-            else tuple(
-                (x, max(0.0, min(1.0, y / maximum)))
-                for x, y in handles
-            )
+            else tuple((x, max(0.0, min(1.0, y / maximum))) for x, y in handles)
             for handles in self.model.curve_handles
         )
 
@@ -195,11 +215,31 @@ class PerlinNoiseTransformView(PopupEditorView):
         self.option_fields = {}
         preset = self.preset_field.currentText()
         definitions = {
-            "Impulse": (("position", 0.5), ("width", 0.12), ("peak", 1.0), ("offset", 0.0)),
+            "Impulse": (
+                ("position", 0.5),
+                ("width", 0.12),
+                ("peak", 1.0),
+                ("offset", 0.0),
+            ),
             "Flat bar": (("value", 1.0), ("offset", 0.0)),
-            "Sin wave": (("cycles", 1.0), ("phase", 0.0), ("offset", 0.5), ("amplitude", 0.5)),
-            "Cos wave": (("cycles", 1.0), ("phase", 0.0), ("offset", 0.5), ("amplitude", 0.5)),
-            "Normal distribution": (("center", 0.5), ("width", 0.18), ("peak", 1.0), ("offset", 0.0)),
+            "Sin wave": (
+                ("cycles", 1.0),
+                ("phase", 0.0),
+                ("offset", 0.5),
+                ("amplitude", 0.5),
+            ),
+            "Cos wave": (
+                ("cycles", 1.0),
+                ("phase", 0.0),
+                ("offset", 0.5),
+                ("amplitude", 0.5),
+            ),
+            "Normal distribution": (
+                ("center", 0.5),
+                ("width", 0.18),
+                ("peak", 1.0),
+                ("offset", 0.0),
+            ),
         }
         for name, value in definitions.get(preset, ()):
             field = DynamicSpinbox()
@@ -215,7 +255,13 @@ class PerlinNoiseTransformView(PopupEditorView):
                 field.setRange(0.0, self.max_amplitude_field.value())
             field.setDecimals(3)
             field.setValue(
-                min(field.maximum(), max(field.minimum(), float(self.model.preset_options.get(name, value))))
+                min(
+                    field.maximum(),
+                    max(
+                        field.minimum(),
+                        float(self.model.preset_options.get(name, value)),
+                    ),
+                )
             )
             field.valueChanged.connect(self._apply_preset)
             self.option_fields[name] = field
@@ -236,7 +282,9 @@ class PerlinNoiseTransformView(PopupEditorView):
             amplitudes = list(self.graph.amplitudes[:count])
             amplitudes.extend([0.0] * (count - len(amplitudes)))
             self.graph.amplitudes = amplitudes
-            self.amplitude_field.setText(", ".join(f"{value:.3g}" for value in amplitudes))
+            self.amplitude_field.setText(
+                ", ".join(f"{value:.3g}" for value in amplitudes)
+            )
             return
         self._set_frequency_data(self._frequency_range_values(count))
 
@@ -256,7 +304,9 @@ class PerlinNoiseTransformView(PopupEditorView):
         )
         self.frequency_count_label.setVisible(visible or continuous_manual)
         self.frequency_count_field.setVisible(visible or continuous_manual)
-        self.manual_sampling_field.setVisible(self.mode_field.currentData() == "continuous")
+        self.manual_sampling_field.setVisible(
+            self.mode_field.currentData() == "continuous"
+        )
 
     def _set_automatic_sample_count(self):
         sample_count = max(2, 2 * self.frequency_max_field.value() + 1)
@@ -300,7 +350,7 @@ class PerlinNoiseTransformView(PopupEditorView):
         )
 
     def _set_frequency_data(self, frequencies):
-        amplitudes = list(self.graph.amplitudes[:len(frequencies)])
+        amplitudes = list(self.graph.amplitudes[: len(frequencies)])
         amplitudes.extend([0.0] * (len(frequencies) - len(amplitudes)))
         self.amplitude_field.setText(", ".join(f"{value:.3g}" for value in amplitudes))
         self.graph.set_data(
@@ -391,18 +441,33 @@ class PerlinNoiseTransformView(PopupEditorView):
         for index in range(count):
             x = index / max(1, count - 1)
             if preset == "Impulse":
-                value = options["peak"] * math.exp(-((x - options["position"]) / max(0.001, options["width"])) ** 2) + options["offset"]
+                value = (
+                    options["peak"]
+                    * math.exp(
+                        -(
+                            ((x - options["position"]) / max(0.001, options["width"]))
+                            ** 2
+                        )
+                    )
+                    + options["offset"]
+                )
             elif preset == "Flat bar":
                 value = options["value"] + options["offset"]
             elif preset in ("Sin wave", "Cos wave"):
-                angle = (
-                    2 * math.pi * options["cycles"] * x
-                    + math.radians(options["phase"])
+                angle = 2 * math.pi * options["cycles"] * x + math.radians(
+                    options["phase"]
                 )
                 wave = math.sin(angle) if preset == "Sin wave" else math.cos(angle)
                 value = options["offset"] + options["amplitude"] * wave
             else:
-                value = options["peak"] * math.exp(-0.5 * ((x - options["center"]) / max(0.001, options["width"])) ** 2) + options["offset"]
+                value = (
+                    options["peak"]
+                    * math.exp(
+                        -0.5
+                        * ((x - options["center"]) / max(0.001, options["width"])) ** 2
+                    )
+                    + options["offset"]
+                )
             values.append(max(0.0, min(1.0, value / amplitude_scale)))
         if self.mode_field.currentData() == "continuous":
             self.graph.curve_points = tuple(
@@ -422,9 +487,13 @@ class PerlinNoiseTransformView(PopupEditorView):
                 amplitudes = self.graph.sampled_values(sample_count)
                 frequencies = self._frequency_range_values(sample_count)
             else:
-                frequencies = self._frequency_range_values(self.frequency_count_field.value())
+                frequencies = self._frequency_range_values(
+                    self.frequency_count_field.value()
+                )
                 amplitudes = tuple(self.graph.amplitudes)
-            amplitudes = tuple(value * self.max_amplitude_field.value() for value in amplitudes)
+            amplitudes = tuple(
+                value * self.max_amplitude_field.value() for value in amplitudes
+            )
             self.model = PerlinNoiseTransformModel(
                 name=self.name_field.unique_name(),
                 frequencies=frequencies,
@@ -440,8 +509,7 @@ class PerlinNoiseTransformView(PopupEditorView):
                     None
                     if handles is None
                     else tuple(
-                        (x, y * self.max_amplitude_field.value())
-                        for x, y in handles
+                        (x, y * self.max_amplitude_field.value()) for x, y in handles
                     )
                     for handles in self.graph.serialized_curve_handles()
                 ),
@@ -451,7 +519,9 @@ class PerlinNoiseTransformView(PopupEditorView):
                 sample_count=sample_count,
                 manual_sampling=self.manual_sampling_field.isChecked(),
                 preset=self.preset_field.currentText(),
-                preset_options={name: field.value() for name, field in self.option_fields.items()},
+                preset_options={
+                    name: field.value() for name, field in self.option_fields.items()
+                },
                 application_mode=self.application_field.currentData(),
                 penetration=self.penetration_field.value(),
             )
@@ -466,5 +536,5 @@ class PerlinNoiseTransformView(PopupEditorView):
 
     @staticmethod
     def load_json(path):
-        with open(path, "r", encoding="utf-8") as stream:
+        with open(path, encoding="utf-8") as stream:
             return PerlinNoiseTransformModel.from_json(json.load(stream))

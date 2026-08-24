@@ -1,8 +1,10 @@
 import numpy as np
 import pyvista as pv
 
-from engine.block_objects import GeneratedMeshBlockObject
-from engine.block_objects import PerlinNoiseTransformBlockObject
+from engine.block_objects import (
+    GeneratedMeshBlockObject,
+    PerlinNoiseTransformBlockObject,
+)
 
 
 class MeshGenerateTask:
@@ -55,17 +57,19 @@ class MeshGenerateTask:
         self.block_object.noise_enabled = self._noise_is_active()
         report(0.35)
         isovalues = self._contour_levels()
-        self.block_object.set_mesh_data(self._build_surface_mesh(
-            self.grid_data,
-            isovalue=isovalues,
-        ))
-        if self._noise_is_active() and getattr(
-            self.model, "show_mask_surface", True
-        ):
-            self.block_object.set_mask_mesh_data(self._build_surface_mesh(
-                base_grid_data,
-                isovalue=self._mask_contour_level(),
-            ))
+        self.block_object.set_mesh_data(
+            self._build_surface_mesh(
+                self.grid_data,
+                isovalue=isovalues,
+            )
+        )
+        if self._noise_is_active() and getattr(self.model, "show_mask_surface", True):
+            self.block_object.set_mask_mesh_data(
+                self._build_surface_mesh(
+                    base_grid_data,
+                    isovalue=self._mask_contour_level(),
+                )
+            )
         self.block_object.commit()
         report(1.0)
         return self.block_object
@@ -105,8 +109,7 @@ class MeshGenerateTask:
                 affected = signed_distance != 0
                 displacement = noise[affected] - 0.5
                 displaced_field = contour_level + (
-                    signed_distance[affected] / penetration
-                    - displacement
+                    signed_distance[affected] / penetration - displacement
                 )
                 field[affected] = displaced_field
             else:
@@ -117,8 +120,7 @@ class MeshGenerateTask:
                 affected = surface_distance >= 0
                 displacement = noise[affected] - 0.5
                 displaced_field = contour_level + (
-                    surface_distance[affected] / penetration
-                    - displacement
+                    surface_distance[affected] / penetration - displacement
                 )
                 field[affected] = displaced_field
 
@@ -163,10 +165,13 @@ class MeshGenerateTask:
 
     @staticmethod
     def _build_surface_layers(active_mask, penetration):
-        return MeshGenerateTask._build_surface_distance(
-            active_mask,
-            penetration,
-        ) >= 0
+        return (
+            MeshGenerateTask._build_surface_distance(
+                active_mask,
+                penetration,
+            )
+            >= 0
+        )
 
     @staticmethod
     def _build_signed_surface_distance(active_mask, penetration):
@@ -207,8 +212,7 @@ class MeshGenerateTask:
                     source[axis] = slice(None, -1)
                     neighbor[axis] = slice(1, None)
                 surface[tuple(source)] |= (
-                    active_mask[tuple(source)]
-                    & ~active_mask[tuple(neighbor)]
+                    active_mask[tuple(source)] & ~active_mask[tuple(neighbor)]
                 )
             distance[surface] = 0
         frontier = surface

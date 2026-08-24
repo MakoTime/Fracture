@@ -1,11 +1,9 @@
-from typing import Optional
-
 from PySide6.QtGui import QIcon
 
+from common.icons import get_icon
 from engine.block_objects import TransformBlockObject
 
 from .object_base import ObjectBase
-from common.icons import get_icon
 
 
 class TransformObject(ObjectBase):
@@ -16,8 +14,8 @@ class TransformObject(ObjectBase):
         name: str,
         block_object: TransformBlockObject,
         comments: str = "",
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         auto_register_root: bool = False,
     ):
         if not isinstance(block_object, TransformBlockObject):

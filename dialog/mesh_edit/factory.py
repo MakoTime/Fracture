@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import MeshEditModel
@@ -9,7 +7,7 @@ from .view import MeshEditView
 def create_mesh_edit_dialog(
     mesh_object,
     colourmaps=(),
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
     deduper=None,
 ) -> MeshEditView:
     """Build a dialog for editing an existing mesh."""

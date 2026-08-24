@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "D100",  # Missing module docstring
+    "D101",  # Missing class docstring
+    "D102",  # Missing method docstring
+    "D103",  # Missing function docstring
+    "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
+    "D107",  # Missing docstring in `__init__`
+    "B905",  # `zip()` without an explicit `strict=` parameter
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -48,8 +46,7 @@ class NotifyView(QDialog):
         )
 
         self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
@@ -85,7 +82,7 @@ class NotifyView(QDialog):
         self.content.setText(model.content)
         self.set_icon(model.icon)
 
-    def set_icon(self, icon: Optional[QPixmap]):
+    def set_icon(self, icon: QPixmap | None):
         """Update the header image, clearing it when no image is supplied."""
         self.notify_icon.clear()
         if icon is not None and not icon.isNull():

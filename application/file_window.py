@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,8 +12,8 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QFileDialog, QLabel
 
 from application.project_version import upgrade_project_data
-from objects.mesh_object import MeshObject
 from engine.block_objects import MeshBlockObject
+from objects.mesh_object import MeshObject
 
 
 @dataclass
@@ -69,7 +69,7 @@ class RecentProjectStore:
             0,
             ProjectEntry(
                 path=path,
-                last_opened=datetime.now(timezone.utc).isoformat(),
+                last_opened=datetime.now(UTC).isoformat(),
             ),
         )
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,10 +87,14 @@ class ProjectListModel(QAbstractTableModel):
         super().__init__()
         self.entries = entries
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return 0 if parent.isValid() else len(self.entries)
 
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return len(self.headers)
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -122,10 +126,14 @@ class ProjectMetadataModel(QAbstractTableModel):
         super().__init__()
         self.rows: list[tuple[str, str]] = []
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return 0 if parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return 2
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -232,9 +240,7 @@ class FileWindow:
 
     def _show_project(self, path: Path, last_opened: str = ""):
         try:
-            data = upgrade_project_data(
-                json.loads(path.read_text(encoding="utf-8"))
-            )
+            data = upgrade_project_data(json.loads(path.read_text(encoding="utf-8")))
         except (OSError, ValueError, TypeError) as error:
             self._clear_preview()
             self.window.previewTitle.setText("Unable to preview project")
@@ -288,9 +294,7 @@ class FileWindow:
             meshes = getattr(self, "_preview_meshes", [])
             meshes.append(preview_object.mesh_data)
             self._preview_meshes = meshes
-        self.window.projectPreview.set_meshes(
-            getattr(self, "_preview_meshes", [])
-        )
+        self.window.projectPreview.set_meshes(getattr(self, "_preview_meshes", []))
 
     def _clear_preview(self):
         self._preview_meshes = []

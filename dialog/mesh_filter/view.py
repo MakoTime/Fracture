@@ -1,22 +1,19 @@
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
-    QLineEdit,
-    QSpinBox,
-    QVBoxLayout,
     QLabel,
     QSplitter,
+    QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import QTimer, Qt
 
 from components.scene import SceneViewer
-from tools.widgets import NameField, VisibleWidget
-
 from dialog.base.tab_editor import TabEditorView
+from tools.widgets import NameField, VisibleWidget
 
 from .model import MeshFilterModel
 
@@ -220,10 +217,7 @@ class MeshFilterView(TabEditorView):
                 opacity=0.85,
                 reset_camera=reset_camera and not has_original,
             )
-        if has_original or (
-            mesh_data is not None
-            and mesh_data.n_points
-        ):
+        if has_original or (mesh_data is not None and mesh_data.n_points):
             self._preview_camera_initialized = True
         self.preview.plotter.render()
 

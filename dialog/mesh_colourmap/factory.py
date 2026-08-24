@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import MeshColourmapModel
@@ -9,7 +7,7 @@ from .view import MeshColourmapView
 def create_mesh_colourmap_dialog(
     model: MeshColourmapModel,
     colourmaps=(),
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
     on_apply=None,
 ) -> MeshColourmapView:
     return MeshColourmapView(

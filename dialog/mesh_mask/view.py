@@ -55,7 +55,9 @@ class MaskCanvas(QWidget):
         for row in range(rows):
             for column in range(columns):
                 rect = self._cell_rect(row, column, cell_size, left, top)
-                color = QColor("#8ecae6") if self.values[row, column] else QColor("#283548")
+                color = (
+                    QColor("#8ecae6") if self.values[row, column] else QColor("#283548")
+                )
                 painter.fillRect(rect, color)
                 painter.setPen(QPen(QColor("#536579"), 1))
                 painter.drawRect(rect)
@@ -180,11 +182,17 @@ class SurfaceMaskView(QDialog):
 
         tools = QHBoxLayout()
         self.tool_buttons = {}
-        for name, label in (("add", "Add"), ("remove", "Remove"), ("bucket", "Bucket Fill")):
+        for name, label in (
+            ("add", "Add"),
+            ("remove", "Remove"),
+            ("bucket", "Bucket Fill"),
+        ):
             button = QToolButton()
             button.setText(label)
             button.setCheckable(True)
-            button.clicked.connect(lambda checked=False, name=name: self._select_tool(name))
+            button.clicked.connect(
+                lambda checked=False, name=name: self._select_tool(name)
+            )
             self.tool_buttons[name] = button
             tools.addWidget(button)
         tools.addStretch(1)
@@ -204,8 +212,7 @@ class SurfaceMaskView(QDialog):
         axis_labels.addWidget(QLabel(f"^ {vertical_axis}"))
 
         self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Cancel
-            | QDialogButtonBox.StandardButton.Ok
+            QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok
         )
         self.button_box.accepted.connect(self._accept)
         self.button_box.rejected.connect(self.reject)

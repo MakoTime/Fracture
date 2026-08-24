@@ -6,78 +6,45 @@ from PySide6.QtGui import QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
 
-class FrequencyAmplitudeGraph(QWidget):
-    """Interactive frequency/amplitude editor for discrete bars or curves."""
+class DropoffGraph(QWidget):
+    """Interactive amplitude drop-off editor for curves."""
 
     values_changed = Signal()
     mouse_position_changed = Signal(float, float)
 
+    AMPLITUDE_MAX = 1.0
+    AMPLITUDE_MIN = 0.0
+    DISTANCE_MAX = 1.0
+    DISTANCE_MIN = 0.0
+
     def __init__(
         self,
-        frequencies=(),
+        distances=(),
         amplitudes=(),
         curve_points=(),
-        curve_mode="discrete",
         parent=None,
         curve_handles=(),
-        frequency_min=None,
-        frequency_max=None,
-        amplitude_max=1.0,
         sample_count=64,
     ):
         super().__init__(parent)
         self.setMinimumSize(360, 230)
         self.setMouseTracking(True)
-        self.frequencies = tuple(frequencies)
+        self.distances = tuple(distances)
         self.amplitudes = [float(value) for value in amplitudes]
         self.curve_points = [QPointF(float(x), float(y)) for x, y in curve_points]
         self.curve_handles = self._normalize_handles(curve_handles)
-        self.curve_mode = curve_mode
-        self.frequency_min = (
-            frequency_min
-            if frequency_min is not None
-            else (self.frequencies[0] if self.frequencies else 0)
-        )
-        self.frequency_max = (
-            frequency_max
-            if frequency_max is not None
-            else (self.frequencies[-1] if self.frequencies else 1)
-        )
-        self.amplitude_max = float(amplitude_max)
+        self.curve_mode = "discrete"
         self.sample_count = max(2, int(sample_count))
         self._drag_index = None
         self._handle_drag_index = None
         self._handle_drag_side = None
         self._handle_drag_origin_x = None
 
-    def set_data(
-        self,
-        frequencies,
-        amplitudes,
-        curve_points=(),
-        curve_mode="discrete",
-        curve_handles=(),
-        frequency_min=None,
-        frequency_max=None,
-        amplitude_max=None,
-    ):
-        self.frequencies = tuple(frequencies)
+    def set_data(self, distances, amplitudes, curve_points=(), curve_handles=()):
+        self.distances = tuple(distances)
         self.amplitudes = [float(value) for value in amplitudes]
         self.curve_points = [QPointF(float(x), float(y)) for x, y in curve_points]
         self.curve_handles = self._normalize_handles(curve_handles)
-        self.curve_mode = curve_mode
-        if frequency_min is not None:
-            self.frequency_min = frequency_min
-        if frequency_max is not None:
-            self.frequency_max = frequency_max
-        if amplitude_max is not None:
-            self.amplitude_max = float(amplitude_max)
-        self.update()
-
-    def set_axis_labels(self, frequency_min, frequency_max, amplitude_max):
-        self.frequency_min = frequency_min
-        self.frequency_max = frequency_max
-        self.amplitude_max = float(amplitude_max)
         self.update()
 
     def set_sample_count(self, count):
@@ -187,7 +154,10 @@ class FrequencyAmplitudeGraph(QWidget):
         return True
 
     def set_amplitudes(self, amplitudes):
-        self.amplitudes = [max(0.0, min(1.0, float(value))) for value in amplitudes]
+        self.amplitudes = [
+            max(self.AMPLITUDE_MIN, min(self.AMPLITUDE_MAX, float(value)))
+            for value in amplitudes
+        ]
         self.update()
         self.values_changed.emit()
 

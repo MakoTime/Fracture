@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from objects.mesh_object import MeshObject
 
-
 Vector3 = tuple[float, float, float]
 
 

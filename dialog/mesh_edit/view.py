@@ -6,10 +6,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from tools.widgets.vector import Vector3Widget
-from tools.widgets import NameField
-from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
 from dialog.base.popup_editor import PopupEditorView
+from dialog.mesh_colourmap import MeshColourmapModel, create_mesh_colourmap_dialog
+from tools.widgets import NameField
+from tools.widgets.vector import Vector3Widget
 
 from .model import MeshEditModel
 
@@ -86,11 +86,11 @@ class MeshEditView(PopupEditorView):
             (
                 colourmap
                 for colourmap in self._colourmaps
-                if getattr(colourmap, "block_object", colourmap)
-                is self.model.colourmap
+                if getattr(colourmap, "block_object", colourmap) is self.model.colourmap
             ),
             None,
         )
+
         def apply_colourmap(model):
             self.model.colourmap = model.colourmap
             self.model.colourmap_field_sources = (
@@ -117,4 +117,3 @@ class MeshEditView(PopupEditorView):
     def _update_colourmap_label(self):
         name = getattr(self.model.colourmap, "name", "None")
         self.colourmap.setText(f"Colourmap: {name}")
-

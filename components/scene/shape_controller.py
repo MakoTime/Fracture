@@ -1,7 +1,5 @@
 from collections import defaultdict
 
-import pyvista as pv
-
 from objects.shape import Shape
 
 
@@ -20,9 +18,7 @@ class ShapeInterface:
         return self.controller.add_line(self.object_base, points, **style)
 
     def add_text(self, value, position, **style):
-        return self.controller.add_text(
-            self.object_base, value, position, **style
-        )
+        return self.controller.add_text(self.object_base, value, position, **style)
 
     def add_mesh(self, data, **style):
         return self.controller.add_mesh(self.object_base, data, **style)
@@ -69,9 +65,7 @@ class ShapeController:
             raise TypeError("shape must be a Shape")
         self.attach(object_base)
         self._shapes[object_base].append(shape)
-        if self.scene_viewer is not None and hasattr(
-            self.scene_viewer, "add_shape"
-        ):
+        if self.scene_viewer is not None and hasattr(self.scene_viewer, "add_shape"):
             self.scene_viewer.add_shape(object_base, shape)
         self._refresh_table(object_base)
         return shape
@@ -90,9 +84,7 @@ class ShapeController:
         if shape not in shapes:
             return False
         shapes.remove(shape)
-        if self.scene_viewer is not None and hasattr(
-            self.scene_viewer, "remove_shape"
-        ):
+        if self.scene_viewer is not None and hasattr(self.scene_viewer, "remove_shape"):
             self.scene_viewer.remove_shape(object_base, shape)
         self._refresh_table(object_base)
         return True
@@ -117,7 +109,5 @@ class ShapeController:
         return tuple(self._shapes.get(object_base, ()))
 
     def _refresh_table(self, object_base):
-        if self.table_model is not None and hasattr(
-            self.table_model, "refresh_object"
-        ):
+        if self.table_model is not None and hasattr(self.table_model, "refresh_object"):
             self.table_model.refresh_object(object_base)

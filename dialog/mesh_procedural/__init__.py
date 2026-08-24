@@ -5,7 +5,7 @@ from .model import MeshProceduralModel
 from .view import MeshProceduralView
 
 __all__ = [
-    "create_mesh_procedural_dialog",
     "MeshProceduralModel",
     "MeshProceduralView",
+    "create_mesh_procedural_dialog",
 ]

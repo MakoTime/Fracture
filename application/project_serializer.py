@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
+
 import pyvista as pv
 
+from application.project_version import CURRENT_PROJECT_VERSION, upgrade_project_data
 from components.tree.roots import (
     colourmap_root,
     island_root,
@@ -19,13 +21,11 @@ from engine.block_objects import (
     PerlinNoiseTransformBlockObject,
     ProceduralMeshBlock,
 )
-from objects.generated_mesh import GeneratedMesh
 from objects.colourmap import ColourmapObject
-from objects.mesh_object import MeshObject
+from objects.generated_mesh import GeneratedMesh
 from objects.island import Island
+from objects.mesh_object import MeshObject
 from objects.procedural_mesh import ProceduralMeshObject
-from application.project_version import CURRENT_PROJECT_VERSION, upgrade_project_data
-
 
 PROJECT_FILE = "project.json"
 BLOCK_DATA_DIRECTORY = "block_data"
@@ -49,7 +49,9 @@ class ProjectSerializer:
         for node in self._walk_nodes(mesh_root):
             mesh_object = node.node_object
             if not isinstance(mesh_object, MeshObject):
-                raise TypeError(f"Unsupported project object: {type(mesh_object).__name__}")
+                raise TypeError(
+                    f"Unsupported project object: {type(mesh_object).__name__}"
+                )
             block = mesh_object.mesh_block_object
             block_path = block.serialise_to_directory(block_directory)
             in_scene = mesh_object in scene_viewer.scene_model.objects
@@ -94,7 +96,9 @@ class ProjectSerializer:
         for node in self._walk_nodes(transform_root):
             transform = node.node_object
             if not hasattr(transform, "block_object"):
-                raise TypeError(f"Unsupported project object: {type(transform).__name__}")
+                raise TypeError(
+                    f"Unsupported project object: {type(transform).__name__}"
+                )
             item = PerlinNoiseTransformModel(
                 name=transform.name,
                 frequencies=transform.block_object.frequencies,
@@ -116,9 +120,7 @@ class ProjectSerializer:
             ).to_json()
             item["comments"] = transform.block_object.comments
             item["parent_guid"] = self._parent_guid(node)
-            item["child_references"] = self._child_references(
-                transform.block_object
-            )
+            item["child_references"] = self._child_references(transform.block_object)
             objects.append(item)
 
         for node in self._walk_nodes(colourmap_root):
@@ -131,16 +133,14 @@ class ProjectSerializer:
                 block_directory / f"{colourmap.guid}.colourmap.json"
             )
             item = {
-                    "type": "colourmap",
-                    "guid": colourmap.guid,
-                    "name": colourmap.name,
-                    "comments": colourmap.block_object.comments,
-                    "parent_guid": self._parent_guid(node),
-                    "child_references": self._child_references(
-                        colourmap.block_object
-                    ),
-                    "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
-                }
+                "type": "colourmap",
+                "guid": colourmap.guid,
+                "name": colourmap.name,
+                "comments": colourmap.block_object.comments,
+                "parent_guid": self._parent_guid(node),
+                "child_references": self._child_references(colourmap.block_object),
+                "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
+            }
             transform = colourmap.block_object.perlin_noise_transform
             item["transform_reference"] = (
                 transform.guid if transform is not None else None
@@ -153,22 +153,24 @@ class ProjectSerializer:
                 raise TypeError(f"Unsupported project object: {type(island).__name__}")
             block = island.block_object
             block_path = block.serialise_to_directory(block_directory)
-            objects.append({
-                "type": "island",
-                "guid": block.guid,
-                "name": block.name,
-                "comments": block.comments,
-                "visible": island.visible,
-                "in_scene": island in scene_viewer.scene_model.objects,
-                "parent_guid": self._parent_guid(node),
-                "child_references": self._child_references(block),
-                "core_offset": block.core_offset,
-                "orbit_speed": block.orbit_speed,
-                "orbit_normal": block.orbit_normal,
-                "orbit_angle": block.orbit_angle,
-                "curve_mesh": block.curve_mesh,
-                "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
-            })
+            objects.append(
+                {
+                    "type": "island",
+                    "guid": block.guid,
+                    "name": block.name,
+                    "comments": block.comments,
+                    "visible": island.visible,
+                    "in_scene": island in scene_viewer.scene_model.objects,
+                    "parent_guid": self._parent_guid(node),
+                    "child_references": self._child_references(block),
+                    "core_offset": block.core_offset,
+                    "orbit_speed": block.orbit_speed,
+                    "orbit_normal": block.orbit_normal,
+                    "orbit_angle": block.orbit_angle,
+                    "curve_mesh": block.curve_mesh,
+                    "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
+                }
+            )
 
         data = {
             "version": CURRENT_PROJECT_VERSION,
@@ -205,9 +207,7 @@ class ProjectSerializer:
         if saved_world_config is not None:
             world_config.update_configuration(
                 name=saved_world_config.get("name", world_config.name),
-                centre=tuple(
-                    saved_world_config.get("centre", world_config.centre)
-                ),
+                centre=tuple(saved_world_config.get("centre", world_config.centre)),
             )
         for item in data.get("objects", []):
             if item.get("type") == "world_config":
@@ -347,9 +347,10 @@ class ProjectSerializer:
                     "guid": item["guid"],
                     "auto_register_root": False,
                 }
-                if object_class is GeneratedMesh:
-                    object_kwargs["grid_data"] = grid_data
-                elif object_class is ProceduralMeshObject:
+                if (
+                    object_class is GeneratedMesh
+                    or object_class is ProceduralMeshObject
+                ):
                     object_kwargs["grid_data"] = grid_data
                 mesh_object = object_class(
                     **object_kwargs,
@@ -430,15 +431,11 @@ class ProjectSerializer:
                         f"{reference.get('guid')}"
                     )
                 if (
-                    isinstance(parent_block, (GeneratedMeshBlockObject, ProceduralMeshBlock))
-                    and isinstance(child_block, PerlinNoiseTransformBlockObject)
-                ):
-                    parent_block.set_perlin_noise_transform(child_block)
-                    parent_block.add_child_block_object(
-                        child_block,
-                        dependent=bool(reference.get("dependent", False)),
+                    isinstance(
+                        parent_block, (GeneratedMeshBlockObject, ProceduralMeshBlock)
                     )
-                elif (
+                    and isinstance(child_block, PerlinNoiseTransformBlockObject)
+                ) or (
                     isinstance(parent_block, ColourmapBlockObject)
                     and isinstance(child_block, PerlinNoiseTransformBlockObject)
                 ):
@@ -455,7 +452,10 @@ class ProjectSerializer:
                     child_block, MeshBlockObject
                 ):
                     parent_block.set_mesh_block(child_block)
-                elif isinstance(parent_block, IslandBlockObject) and child_block is world_config.block_object:
+                elif (
+                    isinstance(parent_block, IslandBlockObject)
+                    and child_block is world_config.block_object
+                ):
                     parent_block.set_world_config(child_block)
                 else:
                     parent_block.add_child_block_object(
@@ -477,9 +477,7 @@ class ProjectSerializer:
                 parent_block.set_perlin_noise_transform(transform_block)
                 parent_block.add_child_block_object(transform_block)
             colourmap_guid = item.get("colourmap_reference")
-            if colourmap_guid is not None and isinstance(
-                parent_block, MeshBlockObject
-            ):
+            if colourmap_guid is not None and isinstance(parent_block, MeshBlockObject):
                 colourmap = loaded.get(colourmap_guid)
                 colourmap_block = getattr(colourmap, "block_object", None)
                 if not isinstance(colourmap_block, ColourmapBlockObject):

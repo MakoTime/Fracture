@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QWidget
 
@@ -11,7 +9,7 @@ class DropdownView(QComboBox):
 
     value_changed = Signal(object)
 
-    def __init__(self, model: DropdownModel, parent: Optional[QWidget] = None):
+    def __init__(self, model: DropdownModel, parent: QWidget | None = None):
         super().__init__(parent)
         self.dropdown_model = model
         self._populate()

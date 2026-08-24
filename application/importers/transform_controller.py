@@ -1,9 +1,8 @@
 import json
-from pathlib import Path
-from typing import Optional
 
-from PySide6.QtWidgets import QFileDialog, QDialog, QTreeView, QWidget
+from PySide6.QtWidgets import QDialog, QFileDialog, QTreeView, QWidget
 
+from common.icons import get_icon
 from components.tree import TreeModel
 from components.tree.roots import transform_root
 from dialog.perlin_noise_transform import (
@@ -13,7 +12,6 @@ from dialog.perlin_noise_transform import (
 from engine.block_tasks import PerlinNoiseTransformTask
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 from tools.dropdown import create_dropdown_menu
-from common.icons import get_icon
 
 
 class TransformController:
@@ -23,7 +21,7 @@ class TransformController:
         self,
         object_importer,
         tree_view: QTreeView,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         engine_runner=None,
     ):
         self.object_importer = object_importer
@@ -57,7 +55,7 @@ class TransformController:
         if not path:
             return None
         try:
-            with open(path, "r", encoding="utf-8") as stream:
+            with open(path, encoding="utf-8") as stream:
                 data = json.load(stream)
             if data.get("type") != "perlin_noise_transform":
                 raise ValueError("unsupported transform type")
@@ -73,8 +71,14 @@ class TransformController:
         if node is transform_root:
             options.extend(
                 (
-                    ("Create Perlin noise transform", self.create_perlin_noise_transform),
-                    ("Import Perlin noise transform", self.import_perlin_noise_transform),
+                    (
+                        "Create Perlin noise transform",
+                        self.create_perlin_noise_transform,
+                    ),
+                    (
+                        "Import Perlin noise transform",
+                        self.import_perlin_noise_transform,
+                    ),
                 )
             )
         elif isinstance(node.node_object, PerlinNoiseTransformObject):

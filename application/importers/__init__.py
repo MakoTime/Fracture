@@ -1,10 +1,10 @@
-from .registry import ImportBindingRegistry, register_import_binding
 from .object_importer import ObjectImporterModel
+from .registry import ImportBindingRegistry, register_import_binding
 
 __all__ = [
+    "ColourmapController",
     "ImportBindingRegistry",
     "MeshImportController",
-    "ColourmapController",
     "ObjectImporterModel",
     "TransformController",
     "WorldConfigController",

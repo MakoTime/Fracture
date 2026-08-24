@@ -13,10 +13,14 @@ class WorldStateModel(QAbstractTableModel):
         self.scene_model = scene_model
         self.rows: list[tuple[str, str]] = []
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return 0 if parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return len(self.HEADERS)
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -36,7 +40,9 @@ class WorldStateModel(QAbstractTableModel):
             if object_base is not world_config
         ]
         scene_objects = list(self.scene_model.objects) if self.scene_model else []
-        visible_objects = [obj for obj in scene_objects if getattr(obj, "visible", False)]
+        visible_objects = [
+            obj for obj in scene_objects if getattr(obj, "visible", False)
+        ]
         rows = [
             ("Mesh objects", str(len(objects))),
             ("Objects in scene", str(len(scene_objects))),

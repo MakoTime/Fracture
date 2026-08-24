@@ -2,8 +2,8 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QColorDialog,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -12,21 +12,17 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMenu,
-    QPushButton,
     QTableWidget,
     QToolButton,
     QVBoxLayout,
 )
-from tools.widgets import NameField
 
-from components.tree import TreeSearch
-from engine.block_objects import PerlinNoiseTransformBlockObject
+from common.icons import get_icon
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
+from tools.widgets import BezierCurveGraph, NameField
 
 from .graph import ColourmapPreview
 from .model import ColourmapModel
-from tools.widgets import BezierCurveGraph
-from common.icons import get_icon
 
 
 class ColourmapView(QDialog):
@@ -51,13 +47,13 @@ class ColourmapView(QDialog):
         self.stops_table.horizontalHeader().setStretchLastSection(True)
         self.stops_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.stops_table.customContextMenuRequested.connect(self._show_grid_menu)
-        self.stops_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
-        )
+        self.stops_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.stops_table.setMinimumHeight(180)
 
         self.field_graph_selector = QComboBox()
-        self.field_graph_selector.addItems((self.model.field1_name, self.model.field2_name))
+        self.field_graph_selector.addItems(
+            (self.model.field1_name, self.model.field2_name)
+        )
         self.field_graph_selector.currentIndexChanged.connect(self._update_axis_graph)
         self.field1_name_field.textChanged.connect(self._update_field_labels)
         self.field2_name_field.textChanged.connect(self._update_field_labels)
@@ -127,8 +123,7 @@ class ColourmapView(QDialog):
         self.error_label.setWordWrap(True)
         self.error_label.setVisible(False)
         self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Cancel
-            | QDialogButtonBox.StandardButton.Ok
+            QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok
         )
         self.button_box.accepted.connect(self._accept)
         self.button_box.rejected.connect(self.reject)
@@ -187,17 +182,13 @@ class ColourmapView(QDialog):
         pixmap = QPixmap(36, 36)
         pixmap.fill(QColor(*rgba))
         button.setIcon(QIcon(pixmap))
-        button.setToolTip(
-            "RGBA: " + ", ".join(f"{channel:.3f}" for channel in colour)
-        )
+        button.setToolTip("RGBA: " + ", ".join(f"{channel:.3f}" for channel in colour))
 
     def _choose_colour(self, button):
         colour = QColorDialog.getColor(parent=button)
         if not colour.isValid():
             return
-        rgba = (
-            colour.redF(), colour.greenF(), colour.blueF(), colour.alphaF()
-        )
+        rgba = (colour.redF(), colour.greenF(), colour.blueF(), colour.alphaF())
         button.setProperty("colour", rgba)
         self._set_colour_button_icon(button, rgba)
         self._refresh_visuals()
@@ -210,6 +201,7 @@ class ColourmapView(QDialog):
             self.model.colour_grid,
         )
         self._update_axis_graph()
+
     def _populate_colour_grid(self):
         self.stops_table.setColumnCount(len(self.model.field1_positions))
         self.stops_table.setRowCount(0)
@@ -222,7 +214,9 @@ class ColourmapView(QDialog):
             self.stops_table.setColumnWidth(column, 64)
 
     def _read_colour_grid(self):
-        self.model.field1_positions = self._even_positions(self.stops_table.columnCount())
+        self.model.field1_positions = self._even_positions(
+            self.stops_table.columnCount()
+        )
         self.model.field2_positions = self._even_positions(self.stops_table.rowCount())
         self.model.colour_grid = tuple(
             tuple(
@@ -274,7 +268,9 @@ class ColourmapView(QDialog):
             menu.addAction("Insert row above"): lambda: self._insert_row(row),
             menu.addAction("Insert row below"): lambda: self._insert_row(row + 1),
             menu.addAction("Insert column left"): lambda: self._insert_column(column),
-            menu.addAction("Insert column right"): lambda: self._insert_column(column + 1),
+            menu.addAction("Insert column right"): lambda: self._insert_column(
+                column + 1
+            ),
         }
         menu.addSeparator()
         remove_row = menu.addAction(get_icon("bin"), "Remove row")
@@ -300,10 +296,12 @@ class ColourmapView(QDialog):
     def _remove_row(self, index):
         if len(self.model.field2_positions) <= 2:
             return
+
         self._read_colour_grid()
-        self.model.colour_grid = tuple(row for row, value in enumerate(self.model.colour_grid) if row != index)
+        self.model.colour_grid = tuple(
+            value for row, value in enumerate(self.model.colour_grid) if row != index
+        )
         self.model.field2_positions = self._even_positions(len(self.model.colour_grid))
-        remove_index = max(0, index - 1)
         self._populate_colour_grid()
         self._refresh_visuals()
 
@@ -313,7 +311,9 @@ class ColourmapView(QDialog):
             tuple((*row[:index], row[min(index, len(row) - 1)], *row[index:]))
             for row in self.model.colour_grid
         )
-        self.model.field1_positions = self._even_positions(len(self.model.colour_grid[0]))
+        self.model.field1_positions = self._even_positions(
+            len(self.model.colour_grid[0])
+        )
         self._populate_colour_grid()
         self._refresh_visuals()
 
@@ -325,8 +325,9 @@ class ColourmapView(QDialog):
             tuple(value for column, value in enumerate(row) if column != index)
             for row in self.model.colour_grid
         )
-        self.model.field1_positions = self._even_positions(len(self.model.colour_grid[0]))
-        remove_index = max(0, index - 1)
+        self.model.field1_positions = self._even_positions(
+            len(self.model.colour_grid[0])
+        )
         self._populate_colour_grid()
         self._refresh_visuals()
 

@@ -1,16 +1,15 @@
-from PySide6.QtCore import QTimer, Qt
+import numpy as np
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
-    QLineEdit,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
-import numpy as np
 
 from components.scene import SceneViewer
 from dialog.base.tab_editor import TabEditorView
@@ -148,9 +147,7 @@ class IslandView(TabEditorView):
         self.model.core_offset = self.offset.value()
         self.model.source_mesh = self.source_mesh.currentData()
         self.model.orbit_speed = self.orbit_speed.value()
-        self.model.orbit_normal = tuple(
-            field.value() for field in self.orbit_normal
-        )
+        self.model.orbit_normal = tuple(field.value() for field in self.orbit_normal)
         self.model.orbit_angle = self.orbit_angle.value()
         self.model.curve_mesh = self.curve_mesh.isChecked()
         self.model.show_in_place = self.show_in_place.isChecked()
@@ -193,14 +190,19 @@ class IslandView(TabEditorView):
             self.preview.plotter.add_mesh(mesh, color="#d6a85f", reset_camera=False)
         if self.model.show_in_place:
             self.preview.plotter.add_mesh(
-                self.model.core_point(), color="#e85d5d", point_size=14,
-                render_points_as_spheres=True, reset_camera=False,
+                self.model.core_point(),
+                color="#e85d5d",
+                point_size=14,
+                render_points_as_spheres=True,
+                reset_camera=False,
             )
             if self.model.show_path and mesh is not None:
                 path = self.model.path()
                 if path.n_points:
                     self.preview.plotter.add_mesh(
-                        path, color="#8fd3c7", line_width=2,
+                        path,
+                        color="#8fd3c7",
+                        line_width=2,
                         reset_camera=False,
                     )
         self.preview.reset_camera()

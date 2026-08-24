@@ -1,5 +1,3 @@
-from typing import Optional
-
 import numpy as np
 from PySide6.QtGui import QIcon
 
@@ -15,10 +13,10 @@ class Island(ViewableMixin, ObjectBase):
     def __init__(
         self,
         name: str = "Island",
-        block_object: Optional[IslandBlockObject] = None,
+        block_object: IslandBlockObject | None = None,
         comments: str = "",
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         visible: bool = True,
         auto_register_root: bool = False,
     ):
@@ -76,9 +74,7 @@ class Island(ViewableMixin, ObjectBase):
         angles = np.linspace(0.0, 360.0, 96)
         points = []
         for angle in angles:
-            radial, _, _ = _orbit_frame(
-                np.asarray(self.orbit_normal), angle
-            )
+            radial, _, _ = _orbit_frame(np.asarray(self.orbit_normal), angle)
             points.append(centre + self.core_offset * radial)
         self.orbit_shape = shape_interface.add_line(
             points,

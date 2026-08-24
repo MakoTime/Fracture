@@ -3,9 +3,9 @@ from .search import TreeSearch
 from .view import TreeView
 
 __all__ = [
-	"TreeManager",
-	"TreeModel",
-	"TreeNode",
-	"TreeSearch",
-	"TreeView",
+    "TreeManager",
+    "TreeModel",
+    "TreeNode",
+    "TreeSearch",
+    "TreeView",
 ]

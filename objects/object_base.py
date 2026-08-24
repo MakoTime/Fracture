@@ -1,6 +1,5 @@
-
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 from PySide6.QtGui import QIcon
@@ -13,6 +12,7 @@ from components.tree.roots.root_objects import root_objects
 class BaseMixin:
     def _detach_other_representations(self):
         pass
+
 
 class ViewableMixin(BaseMixin):
     """Adds scene/table representation to an ObjectBase."""
@@ -78,9 +78,7 @@ class ViewableMixin(BaseMixin):
         elif hasattr(scene, "append"):
             scene.append(self)
         else:
-            raise TypeError(
-                "scene must provide add_object(), add(), or append()"
-            )
+            raise TypeError("scene must provide add_object(), add(), or append()")
 
         return self
 
@@ -97,10 +95,9 @@ class ViewableMixin(BaseMixin):
             self._scene = None
 
         return removed
-    
+
     def on_selected(self):
-        """Called when the object is selected in the scene or table."""
-        pass
+        """Handle selection of the object in the scene or table."""
 
     def set_visible(self, visible: bool):
         self.row_data.visible.on_change(bool(visible))
@@ -114,9 +111,8 @@ class ViewableMixin(BaseMixin):
             self.visible = bool(visible)
             self.row_data.visible.visible = self.visible
 
-            if (
-                self._scene is not None
-                and hasattr(self._scene, "set_object_visibility")
+            if self._scene is not None and hasattr(
+                self._scene, "set_object_visibility"
             ):
                 self._scene.set_object_visibility(
                     self,
@@ -124,9 +120,8 @@ class ViewableMixin(BaseMixin):
                 )
 
     def _detach_other_representations(self):
-        if (
-            self._table_manager is not None
-            and hasattr(self._table_manager, "remove_object")
+        if self._table_manager is not None and hasattr(
+            self._table_manager, "remove_object"
         ):
             self._table_manager.remove_object(self)
 
@@ -135,15 +130,14 @@ class ViewableMixin(BaseMixin):
         super()._detach_other_representations()
 
 
-
 class ObjectBase:
     def __init__(
         self,
         name: str,
-        icon: Optional[QIcon] = None,
+        icon: QIcon | None = None,
         progress: float = 0.0,
-        metadata: Optional[dict[str, Any]] = None,
-        guid: Optional[str] = None,
+        metadata: dict[str, Any] | None = None,
+        guid: str | None = None,
         auto_register_root: bool = True,
     ):
         self.name = name
@@ -163,13 +157,9 @@ class ObjectBase:
         block = getattr(self, "block_object", None)
         if block is not None:
             if hasattr(block, "add_destruction_callback"):
-                block.add_destruction_callback(
-                    self._on_block_destroyed
-                )
+                block.add_destruction_callback(self._on_block_destroyed)
             if hasattr(block, "add_change_callback"):
-                block.add_change_callback(
-                    self._on_block_changed
-                )
+                block.add_change_callback(self._on_block_changed)
 
         if auto_register_root:
             root_objects.add(self.node)
@@ -210,10 +200,7 @@ class ObjectBase:
     def _on_block_changed(self, block):
         if hasattr(self, "_table_manager"):
             table_manager = self._table_manager
-            if (
-                table_manager is not None
-                and hasattr(table_manager, "refresh_object")
-            ):
+            if table_manager is not None and hasattr(table_manager, "refresh_object"):
                 table_manager.refresh_object(self)
 
         if hasattr(self, "_scene"):
@@ -230,7 +217,7 @@ class ObjectBase:
 
         for child in tuple(self.node.children):
             self.node.remove_child(child)
-            
+
     def _detach_other_representations(self):
         pass  # Placeholder for any additional detachment logic
 
@@ -281,4 +268,3 @@ class ObjectBase:
                 self.node.icon = self.icon
             if hasattr(self, "row_data"):
                 self.row_data.obj.icon = self.icon
-    

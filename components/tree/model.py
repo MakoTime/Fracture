@@ -4,6 +4,16 @@ from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
 from PySide6.QtGui import QIcon
 
 
+def has_name_attribute(object_base):
+    """Return whether an object has a given name."""
+    try:
+        return isinstance(object_base.name, str)
+    except AttributeError as e:
+        raise ValueError(
+            f"Object {object_base} does not have a name attribute: {e}"
+        ) from e
+
+
 class TreeNode:
     """Represents a node in the tree structure."""
 
@@ -91,12 +101,16 @@ class TreeModel(QAbstractItemModel):
         self.root_data = root_data
         self.duplicate_name_handler = duplicate_name_handler
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         if not parent.isValid():
             return len(self.root_data)
         return len(parent.internalPointer().children)
 
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         return 1
 
     def data(self, index, role=Qt.DisplayRole):
@@ -172,8 +186,28 @@ class TreeModel(QAbstractItemModel):
         while f"{prefix} {number:03d}" in names:
             number += 1
         return f"{prefix} {number:03d}"
+    
+    @staticmethod
+    def next_name_static(prefix, exclude=None):
+        prefix = str(prefix).strip() or "Object"
+        match = re.match(r"^(.*) \d{3}$", prefix)
+        if match:
+            prefix = match.group(1)
+        names = {
+            obj.name
+            for obj in existing_objects
+            if obj is not exclude and has_name_attribute(obj)
+        }
+        if prefix not in names:
+            return prefix
+        number = 1
+        while f"{prefix} {number:03d}" in names:
+            number += 1
+        return f"{prefix} {number:03d}"
 
-    def index(self, row, column, parent=QModelIndex()):
+    def index(self, row, column, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
         if not parent.isValid():

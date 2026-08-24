@@ -1,24 +1,22 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
-    QCheckBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QPushButton,
-    QDoubleSpinBox,
     QTextEdit,
     QVBoxLayout,
 )
 
-from tools.widgets.vector import Vector3Widget
 from tools.widgets import NameField
+from tools.widgets.vector import Vector3Widget
 
 from .model import MeshImportModel
 
@@ -27,8 +25,7 @@ class MeshImportView(QDialog):
     """Dialog for reviewing mesh metadata and transform values."""
 
     MESH_FILTER = (
-        "Mesh files (*.obj *.stl *.ply *.vtk *.vtp *.vtu *.glb *.gltf);;"
-        "All files (*)"
+        "Mesh files (*.obj *.stl *.ply *.vtk *.vtp *.vtu *.glb *.gltf);;All files (*)"
     )
 
     def __init__(self, model: MeshImportModel, parent=None, deduper=None):
@@ -77,8 +74,7 @@ class MeshImportView(QDialog):
         transform_group.setLayout(transforms)
 
         self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         self.button_box.accepted.connect(self._accept)
         self.button_box.rejected.connect(self.reject)
@@ -132,7 +128,9 @@ class MeshImportView(QDialog):
 class ElevationImportView(MeshImportView):
     """Dialog for importing a grayscale image as elevation data."""
 
-    MESH_FILTER = "Elevation images (*.bmp *.jpg *.jpeg *.png *.tif *.tiff);;All files (*)"
+    MESH_FILTER = (
+        "Elevation images (*.bmp *.jpg *.jpeg *.png *.tif *.tiff);;All files (*)"
+    )
 
     def __init__(self, model: MeshImportModel, parent=None, deduper=None):
         super().__init__(model, parent, deduper=deduper)
@@ -151,12 +149,8 @@ class ElevationImportView(MeshImportView):
         self.vertical_scale.setRange(0.0, 10000.0)
         self.vertical_scale.setDecimals(3)
         self.vertical_scale.setSingleStep(0.1)
-        self.low_threshold.valueChanged.connect(
-            self.high_threshold.setMinimum
-        )
-        self.high_threshold.valueChanged.connect(
-            self.low_threshold.setMaximum
-        )
+        self.low_threshold.valueChanged.connect(self.high_threshold.setMinimum)
+        self.high_threshold.valueChanged.connect(self.low_threshold.setMaximum)
 
         controls = QFormLayout()
         controls.addRow("Low threshold", self.low_threshold)

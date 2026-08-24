@@ -2,9 +2,11 @@
 
 Example:
     python -m tools.create_elevation_bitmap terrain.png --width 512 --height 512
+
 """
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +20,29 @@ def _fade(values):
 
 def _interpolate(left, right, amount):
     return left + amount * (right - left)
+
+
+@dataclass
+class DotGradient:
+    fraction_x: np.ndarray
+    fraction_y: np.ndarray
+    gradients_x: np.ndarray
+    gradients_y: np.ndarray
+    cell_x: np.ndarray
+    cell_y: np.ndarray
+
+    def calculate(self, offset_x: int, offset_y: int) -> np.ndarray:
+        gradient_x = self.gradients_x[
+            self.cell_y + offset_y,
+            self.cell_x + offset_x,
+        ]
+        gradient_y = self.gradients_y[
+            self.cell_y + offset_y,
+            self.cell_x + offset_x,
+        ]
+        distance_x = self.fraction_x - offset_x
+        distance_y = self.fraction_y - offset_y
+        return gradient_x * distance_x + gradient_y * distance_y
 
 
 def generate_perlin_noise(
@@ -65,21 +90,23 @@ def generate_perlin_noise(
         gradients_x = np.cos(angles)
         gradients_y = np.sin(angles)
 
-        def dot_gradient(offset_x, offset_y):
-            gradient_x = gradients_x[cell_y + offset_y, cell_x + offset_x]
-            gradient_y = gradients_y[cell_y + offset_y, cell_x + offset_x]
-            distance_x = fraction_x - offset_x
-            distance_y = fraction_y - offset_y
-            return gradient_x * distance_x + gradient_y * distance_y
+        dot_gradient = DotGradient(
+            fraction_x=fraction_x,
+            fraction_y=fraction_y,
+            gradients_x=gradients_x,
+            gradients_y=gradients_y,
+            cell_x=cell_x,
+            cell_y=cell_y,
+        )
 
         top = _interpolate(
-            dot_gradient(0, 0),
-            dot_gradient(1, 0),
+            dot_gradient.calculate(0, 0),
+            dot_gradient.calculate(1, 0),
             _fade(fraction_x),
         )
         bottom = _interpolate(
-            dot_gradient(0, 1),
-            dot_gradient(1, 1),
+            dot_gradient.calculate(0, 1),
+            dot_gradient.calculate(1, 1),
             _fade(fraction_x),
         )
         result += amplitude * _interpolate(
@@ -137,7 +164,9 @@ def _parse_args():
     parser = argparse.ArgumentParser(
         description="Create a grayscale elevation bitmap from layered Perlin noise."
     )
-    parser.add_argument("output", type=Path, help="Output image path, such as terrain.png")
+    parser.add_argument(
+        "output", type=Path, help="Output image path, such as terrain.png"
+    )
     parser.add_argument("--width", type=int, default=100)
     parser.add_argument("--height", type=int, default=100)
     parser.add_argument(

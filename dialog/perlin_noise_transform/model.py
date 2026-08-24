@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 from dialog.base.editor import EditorModel
-
 from objects.perlin_noise_transform import PerlinNoiseTransformObject
 
 
@@ -112,7 +111,9 @@ class PerlinNoiseTransformModel(EditorModel):
             curve_handles=tuple(data.get("curve_handles", ())),
             frequency_start=float(data.get("frequency_start", 1.0)),
             frequency_end=float(data.get("frequency_end", 8.0)),
-            sample_count=int(data.get("sample_count", len(data.get("frequencies", (4,))))),
+            sample_count=int(
+                data.get("sample_count", len(data.get("frequencies", (4,))))
+            ),
             manual_sampling=bool(data.get("manual_sampling", False)),
             preset=data.get("preset", "Manual"),
             preset_options=dict(data.get("preset_options", {})),

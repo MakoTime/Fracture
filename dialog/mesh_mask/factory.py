@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import SurfaceMaskModel
@@ -10,7 +8,7 @@ def create_surface_mask_dialog(
     axis: str,
     shape: tuple[int, int],
     mask=None,
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
 ) -> SurfaceMaskView:
     """Build a surface-mask editor for one generated-mesh plane."""
     model = SurfaceMaskModel(axis=axis, shape=shape, mask=mask)

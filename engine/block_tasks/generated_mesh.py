@@ -1,5 +1,6 @@
-from .mesh_generate import MeshGenerateTask
 from engine.block_objects import PerlinNoiseTransformBlockObject
+
+from .mesh_generate import MeshGenerateTask
 
 
 class GeneratedMeshTask:

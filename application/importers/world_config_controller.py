@@ -33,7 +33,7 @@ class WorldConfigController:
         if isinstance(model, TreeModel):
             deduper = lambda name: model.next_name(name, exclude=world_config)
         else:
-            deduper = lambda name: name
+            deduper = lambda name: TreeModel.next_name_static(name, exclude=world_config)
         dialog = create_world_config_dialog(
             world_config, parent=self.parent, deduper=deduper
         )

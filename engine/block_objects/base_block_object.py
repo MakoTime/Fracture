@@ -22,7 +22,7 @@ class BlockObject(ABC):
     def __hash__(self):
         """Hash blocks by their stable project GUID."""
         return hash(self.guid)
-        
+
     def invalidate(self, force=False):
         """Mark the block invalid and notify any task manager watching it."""
         self._invalidate(set(), force=force)
@@ -113,9 +113,11 @@ class BlockObject(ABC):
     @property
     def relationship_child_block_objects(self):
         """Return all registered children, including change relationships."""
-        return tuple(dict.fromkeys(
-            (*self._child_block_objects, *self._change_child_block_objects)
-        ))
+        return tuple(
+            dict.fromkeys(
+                (*self._child_block_objects, *self._change_child_block_objects)
+            )
+        )
 
     def validate(self):
         """Mark the block valid after successful processing."""
@@ -199,7 +201,6 @@ class BlockObject(ABC):
         This method is called when the block object is added to a project and
         should be used to perform any necessary initialization or validation.
         """
-        pass
 
     @abstractmethod
     def process(self, prepared, progress_callback=None):
@@ -208,18 +209,15 @@ class BlockObject(ABC):
         This method is called after the block object has been prepared and
         should be used to perform any necessary processing or computation.
         """
-        pass
 
     @abstractmethod
     def serialise(self, path):
+        """Serialise any serialisable objects owned by the block object
+        after the result is processed.
         """
-        Serialise any serialisable objects owned by the block object after the result is processed.
-        """
-        pass
-    
+
     @abstractmethod
     def serialise_to_directory(self, directory):
+        """Serialise any serialisable objects owned by the block object
+        after the result is processed.
         """
-        Serialise any serialisable objects owned by the block object after the result is processed.
-        """
-        pass

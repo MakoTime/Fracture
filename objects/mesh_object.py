@@ -1,11 +1,11 @@
-from typing import Any, Optional
+from typing import Any
 
 from PySide6.QtGui import QIcon
 
 from common.icons import get_icon
 from engine.block_objects import MeshBlockObject
-from .object_base import ObjectBase, ViewableMixin
 
+from .object_base import ObjectBase, ViewableMixin
 
 Vector3 = tuple[float, float, float]
 
@@ -17,15 +17,15 @@ class MeshObject(ViewableMixin, ObjectBase):
         self,
         name: str,
         mesh_data: Any = None,
-        block_object: Optional[MeshBlockObject] = None,
+        block_object: MeshBlockObject | None = None,
         source_path: str = "",
         comments: str = "",
         scale: Vector3 = (1.0, 1.0, 1.0),
         rotation: Vector3 = (0.0, 0.0, 0.0),
         offset: Vector3 = (0.0, 0.0, 0.0),
         visible: bool = False,
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         auto_register_root: bool = False,
     ):
         self.source_path = source_path
@@ -60,7 +60,11 @@ class MeshObject(ViewableMixin, ObjectBase):
 
     @property
     def name(self):
-        return self.mesh_block_object.name if hasattr(self, "mesh_block_object") else self._name
+        return (
+            self.mesh_block_object.name
+            if hasattr(self, "mesh_block_object")
+            else self._name
+        )
 
     @name.setter
     def name(self, value):
@@ -70,7 +74,11 @@ class MeshObject(ViewableMixin, ObjectBase):
 
     @property
     def guid(self):
-        return self.mesh_block_object.guid if hasattr(self, "mesh_block_object") else self._guid
+        return (
+            self.mesh_block_object.guid
+            if hasattr(self, "mesh_block_object")
+            else self._guid
+        )
 
     @guid.setter
     def guid(self, value):
@@ -80,7 +88,11 @@ class MeshObject(ViewableMixin, ObjectBase):
 
     @property
     def comments(self):
-        return self.mesh_block_object.comments if hasattr(self, "mesh_block_object") else self._comments
+        return (
+            self.mesh_block_object.comments
+            if hasattr(self, "mesh_block_object")
+            else self._comments
+        )
 
     @comments.setter
     def comments(self, value):
@@ -98,7 +110,11 @@ class MeshObject(ViewableMixin, ObjectBase):
 
     @property
     def scene_data(self):
-        return self.mesh_block_object.scene_data if hasattr(self, "mesh_block_object") else self._scene_data
+        return (
+            self.mesh_block_object.scene_data
+            if hasattr(self, "mesh_block_object")
+            else self._scene_data
+        )
 
     @scene_data.setter
     def scene_data(self, value):

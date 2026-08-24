@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import MeshFilterModel
@@ -8,7 +6,7 @@ from .view import MeshFilterView
 
 def create_mesh_filter_dialog(
     model: MeshFilterModel,
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
     on_apply=None,
     transforms=(),
     deduper=None,

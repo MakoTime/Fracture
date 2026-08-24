@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+
+
 @dataclass
 class SkyDome:
     """Configurable world-height gradient rendered behind scene objects."""
@@ -28,4 +30,3 @@ class SkyDome:
     def remove(self):
         """Release the plotter reference after a renderer reset."""
         self.plotter = None
-

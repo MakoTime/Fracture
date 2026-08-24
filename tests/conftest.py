@@ -5,7 +5,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from components.tree.roots import colourmap_root, mesh_root, root_objects, transform_root
+from components.tree.roots import (
+    colourmap_root,
+    mesh_root,
+    root_objects,
+    transform_root,
+)
 
 
 @pytest.fixture(scope="session")

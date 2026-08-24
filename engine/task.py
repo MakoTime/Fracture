@@ -1,8 +1,9 @@
+import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import Enum
-import inspect
 from threading import Event
-from typing import Callable, Optional, Protocol
+from typing import Protocol
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
@@ -19,28 +20,25 @@ class TaskStatus(Enum):
 class EngineTask:
     name: str
     work: Callable[..., None]
-    on_finished: Optional[Callable[["EngineTask"], None]] = None
+    on_finished: Callable[["EngineTask"], None] | None = None
     status: TaskStatus = TaskStatus.QUEUED
     progress: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
     task_id: int = field(default=0)
 
 
 class BlockTask(Protocol):
     block_object: object
 
-    def prepare(self):
-        ...
+    def prepare(self): ...
 
-    def process(self, prepared, progress_callback=None):
-        ...
+    def process(self, prepared, progress_callback=None): ...
 
 
 def _call_with_optional_progress(work, progress_callback):
     parameters = inspect.signature(work).parameters.values()
     accepts_progress = any(
-        parameter.kind
-        in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+        parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
         for parameter in parameters
     )
     if accepts_progress:
@@ -104,7 +102,7 @@ class EngineTaskModel(QObject):
         self,
         name: str,
         work: Callable[..., None],
-        on_finished: Optional[Callable[[EngineTask], None]] = None,
+        on_finished: Callable[[EngineTask], None] | None = None,
     ) -> EngineTask:
         task = EngineTask(
             name=name,
@@ -122,7 +120,7 @@ class EngineTaskModel(QObject):
         self,
         name: str,
         block_task: BlockTask,
-        on_finished: Optional[Callable[[EngineTask], None]] = None,
+        on_finished: Callable[[EngineTask], None] | None = None,
     ) -> EngineTask:
         """Queue a block task and retry it when its block is invalidated."""
         self._validate_block_task_contract(block_task)
@@ -170,12 +168,10 @@ class EngineTaskModel(QObject):
             in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
         ]
         if len(positional) != 2 or any(
-            parameter.kind is parameter.VAR_POSITIONAL
-            for parameter in parameters
+            parameter.kind is parameter.VAR_POSITIONAL for parameter in parameters
         ):
             raise TypeError(
-                "Block tasks must implement process(prepared, "
-                "progress_callback=None)"
+                "Block tasks must implement process(prepared, progress_callback=None)"
             )
 
     def remove_block_task(self, block_object):
@@ -309,8 +305,7 @@ class EngineTaskModel(QObject):
         binding["engine_task"] = None
         if (
             task.status is TaskStatus.COMPLETED
-            and
-            not binding["task"].block_object.is_destroyed()
+            and not binding["task"].block_object.is_destroyed()
             and (binding["pending"] or not binding["task"].block_object.is_valid())
         ):
             binding["pending"] = False
@@ -339,7 +334,11 @@ class EngineTaskModel(QObject):
         if self._paused or self._thread_pool.activeThreadCount():
             return
         task = next(
-            (item for item in self.tasks if item.status in (TaskStatus.QUEUED, TaskStatus.PAUSED)),
+            (
+                item
+                for item in self.tasks
+                if item.status in (TaskStatus.QUEUED, TaskStatus.PAUSED)
+            ),
             None,
         )
         if task is None:

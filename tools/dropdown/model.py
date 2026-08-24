@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -45,5 +46,5 @@ class DropdownModel:
             raise ValueError(f"dropdown value is not available: {value!r}")
         self.current_value = value
 
-    def find(self, value: Any) -> Optional[DropdownOption]:
+    def find(self, value: Any) -> DropdownOption | None:
         return next((option for option in self.options if option.value == value), None)

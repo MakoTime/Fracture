@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtWidgets import QWidget
 
 from .model import IslandModel
@@ -8,7 +6,7 @@ from .view import IslandView
 
 def create_island_dialog(
     island,
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
     on_apply=None,
     source_meshes=(),
     new_island=False,

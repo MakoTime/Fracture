@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtGui import QIcon
 
 from engine.block_objects import PerlinNoiseTransformBlockObject
@@ -13,10 +11,10 @@ class PerlinNoiseTransformObject(TransformObject):
     def __init__(
         self,
         name: str = "Perlin Noise Transform",
-        block_object: Optional[PerlinNoiseTransformBlockObject] = None,
+        block_object: PerlinNoiseTransformBlockObject | None = None,
         comments: str = "",
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         auto_register_root: bool = False,
     ):
         block = block_object or PerlinNoiseTransformBlockObject()

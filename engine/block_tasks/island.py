@@ -80,9 +80,7 @@ def build_island_mesh(prepared):
         up_angle = local_points[:, 1] / radius
         arc_radius = radius + local_points[:, 2]
         curved_points = np.empty_like(local_points)
-        curved_points[:, 0] = (
-            arc_radius * np.sin(tangent_angle) * np.cos(up_angle)
-        )
+        curved_points[:, 0] = arc_radius * np.sin(tangent_angle) * np.cos(up_angle)
         curved_points[:, 1] = arc_radius * np.sin(up_angle)
         curved_points[:, 2] = (
             arc_radius * np.cos(tangent_angle) * np.cos(up_angle) - radius

@@ -102,7 +102,7 @@ class IslandModel(EditorModel):
         source_block = getattr(source, "block_object", source)
         return build_island_mesh(
             {
-            "mesh_data": source_block.scene_data,
+                "mesh_data": source_block.scene_data,
                 "centre": tuple(block.world_config.centre),
                 "core_offset": self.core_offset,
                 "orbit_phase": self.orbit_speed * float(elapsed_seconds),

@@ -4,8 +4,8 @@ from .model import EditorModel
 from .view import EditorButtonBoxImplementation, EditorView, HasEditorButtons
 
 __all__ = [
-	"EditorButtonBoxImplementation",
-	"EditorModel",
-	"EditorView",
-	"HasEditorButtons",
+    "EditorButtonBoxImplementation",
+    "EditorModel",
+    "EditorView",
+    "HasEditorButtons",
 ]

@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QDialogButtonBox, QTabWidget
 
 from dialog.base.editor import EditorModel
-from dialog.base.tab_editor import TabEditorView
 from dialog.base.popup_editor import PopupEditorView
+from dialog.base.tab_editor import TabEditorView
 
 
 def test_editor_view_applies_and_closes_workspace_tab(qapp):

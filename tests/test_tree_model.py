@@ -49,9 +49,7 @@ def test_tree_model_renames_object_with_duplicate_name_handler():
     try:
         model = TreeModel(
             [first.node, second.node],
-            duplicate_name_handler=lambda name, obj: model.next_name(
-                name, exclude=obj
-            ),
+            duplicate_name_handler=lambda name, obj: model.next_name(name, exclude=obj),
         )
 
         assert model.setData(model.index(1, 0), "Noise", Qt.EditRole)
@@ -98,7 +96,6 @@ def test_tree_object_removal_removes_child_aliases():
     transform_root = TreeNode("Transforms")
     transform_root.add_child(transform.node)
     parent.set_block_child_objects([transform])
-    roots = [parent, transform_root]
 
     from components.tree.roots import root_objects
 

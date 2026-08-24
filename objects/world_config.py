@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PySide6.QtGui import QIcon
 
 from common.icons import get_icon
@@ -14,9 +12,9 @@ class WorldConfig(ObjectBase):
     def __init__(
         self,
         name: str = "World Config",
-        block_object: Optional[WorldConfigBlockObject] = None,
-        icon: Optional[QIcon] = None,
-        guid: Optional[str] = None,
+        block_object: WorldConfigBlockObject | None = None,
+        icon: QIcon | None = None,
+        guid: str | None = None,
         auto_register_root: bool = False,
     ):
         block = block_object or WorldConfigBlockObject(name=name, guid=guid)
@@ -36,7 +34,11 @@ class WorldConfig(ObjectBase):
 
     @property
     def name(self):
-        return self.world_config_block_object.name if hasattr(self, "world_config_block_object") else self._name
+        return (
+            self.world_config_block_object.name
+            if hasattr(self, "world_config_block_object")
+            else self._name
+        )
 
     @name.setter
     def name(self, value):

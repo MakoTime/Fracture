@@ -1,6 +1,6 @@
 from .model import SceneModel
+from .shape_controller import ShapeController
 from .sky_dome import SkyDome
 from .view import SceneViewer
-from .shape_controller import ShapeController
 
-__all__ = ["SceneModel", "SceneViewer", "SkyDome", "ShapeController"]
+__all__ = ["SceneModel", "SceneViewer", "ShapeController", "SkyDome"]

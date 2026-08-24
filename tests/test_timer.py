@@ -1,5 +1,3 @@
-import numpy as np
-
 from components.timer import TimerController
 
 
@@ -9,7 +7,6 @@ class TimedObject:
 
     def update_at_time(self, elapsed_seconds, delta_seconds):
         self.updates.append((elapsed_seconds, delta_seconds))
-        return None
 
 
 def test_timer_interface_dispatches_elapsed_and_delta_time():
