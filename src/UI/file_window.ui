@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>FileWindow</class>
+ <widget class="QDialog" name="FileWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1120</width><height>720</height></rect>
+  </property>
+  <property name="windowTitle"><string>Fracture Projects</string></property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <item>
+    <widget class="QSplitter" name="contentSplitter">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <property name="stretchFactor"><string notr="true">1</string></property>
+     <widget class="QWidget" name="projectsPanel">
+      <layout class="QVBoxLayout" name="projectsLayout">
+       <item><widget class="QLabel" name="projectsTitle"><property name="text"><string>Recent projects</string></property><property name="font"><font><pointsize>14</pointsize><bold>true</bold></font></property></widget></item>
+       <item><widget class="QTableView" name="recentProjectsTable"><property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property><property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property><property name="alternatingRowColors"><bool>true</bool></property></widget></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="detailsPanel">
+      <layout class="QVBoxLayout" name="detailsLayout">
+       <item><widget class="QLabel" name="previewTitle"><property name="text"><string>Select a project</string></property><property name="font"><font><pointsize>14</pointsize><bold>true</bold></font></property></widget></item>
+    <item><widget class="ProjectPreview" name="projectPreview"><property name="minimumSize"><size><width>320</width><height>280</height></size></property></widget></item>
+       <item><widget class="QLabel" name="metadataTitle"><property name="text"><string>Project metadata</string></property><property name="font"><font><bold>true</bold></font></property></widget></item>
+       <item><widget class="QTableView" name="metadataTable"><property name="selectionMode"><enum>QAbstractItemView::NoSelection</enum></property><property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property><property name="alternatingRowColors"><bool>true</bool></property></widget></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonsLayout">
+    <item><spacer name="buttonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+      <item><widget class="QPushButton" name="newButton"><property name="text"><string>New project...</string></property></widget></item>
+     <item><widget class="QPushButton" name="browseButton"><property name="text"><string>Open project...</string></property></widget></item>
+     <item><widget class="QPushButton" name="openButton"><property name="text"><string>Open selected</string></property><property name="default"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="cancelButton"><property name="text"><string>Quit</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+</ui>

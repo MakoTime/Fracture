@@ -1,6 +1,6 @@
-# RainFall
+# Fracture
 
-RainFall is a PySide6 desktop application for importing and viewing mesh data with PyVista.
+Fracture is a PySide6 desktop application for simulating and creating a a fractured planet with floating islands
 
 ## Requirements
 

@@ -1,4 +1,4 @@
-# RainFall Project Rules
+# Fracture Project Rules
 
 - Use the project virtual environment for Python commands.
 - Run tests with `.venv/Scripts/python.exe -m pytest`.

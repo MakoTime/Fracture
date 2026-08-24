@@ -1,6 +1,6 @@
 ---
 name: Python Testing
-description: "Use when adding or modifying Python code or tests in the RainFall project, especially Qt, PyVista, engine, serialization, and registration behavior."
+description: "Use when adding or modifying Python code or tests in the Fracture project, especially Qt, PyVista, engine, serialization, and registration behavior."
 applyTo:
   - "**/*.py"
 ---
