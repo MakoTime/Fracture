@@ -27,6 +27,7 @@ jobs:
 
       - name: Run tests
         run: |
+          $env:PYTHONPATH = "${{ github.workspace }}"
           pytest
 
       - name: Build executable
