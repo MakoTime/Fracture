@@ -7,9 +7,6 @@ from PySide6.QtCore import QEventLoop, Qt, QTimer
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QWidget
 
-from src.components.tree.roots import (
-    root_objects,
-)
 from src.application.importers import (
     ColourmapController,
     MeshImportController,
@@ -25,6 +22,7 @@ from src.components.tree.roots import (
     colourmap_root,
     island_root,
     mesh_root,
+    root_objects,
     world_config,
 )
 from src.dialog.mesh_edit.model import MeshEditModel

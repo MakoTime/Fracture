@@ -1,6 +1,7 @@
 import numpy as np
 import pyvista as pv
 
+from src.common.calendar.time import WorldTime, WorldTimeDelta
 from src.dialog.mesh_filter import MeshFilterModel
 from src.dialog.mesh_generate import MeshGenerateModel
 from src.dialog.perlin_noise_transform import PerlinNoiseTransformModel
@@ -221,6 +222,7 @@ def test_curved_island_mesh_follows_arc_at_core_radius():
             "orbit_normal": (0.0, 0.0, 1.0),
             "orbit_angle": 0.0,
             "curve_mesh": True,
+            "reference_time": WorldTime(0, 0, 0, 0, 0, 0),
         }
     )
 
@@ -259,6 +261,7 @@ def test_curved_island_mesh_bends_both_surface_axes():
             "orbit_normal": (0.0, 0.0, 1.0),
             "orbit_angle": 0.0,
             "curve_mesh": True,
+            "reference_time": WorldTime(0, 0, 0, 0, 0, 0),
         }
     )
 
@@ -284,6 +287,7 @@ def test_curve_mesh_does_not_bend_at_zero_core_radius():
         "centre": (0.0, 0.0, 0.0),
         "core_offset": 0.0,
         "orbit_normal": (0.0, 0.0, 1.0),
+        "reference_time": WorldTime(0, 0, 0, 0, 0, 0),
     }
     result = build_island_mesh(
         {
@@ -297,27 +301,33 @@ def test_curve_mesh_does_not_bend_at_zero_core_radius():
 
 
 def test_island_orbit_speed_advances_angle_without_changing_radius():
+    start_time = WorldTime(0, 0, 0, 0, 0, 0)
     island = IslandBlockObject(orbit_speed=15.0, orbit_angle=20.0)
 
-    assert island.orbit_angle_at_time(0.0) == 20.0
-    assert island.orbit_angle_at_time(4.0) == 80.0
+    assert island.orbit_angle_at_time(start_time) == 20.0
+    assert island.orbit_angle_at_time(
+        start_time.advance(WorldTimeDelta(seconds=4))
+    ) == 80.0
 
 
 def test_island_orbit_transform_moves_baked_mesh_without_rebuilding_it():
     world_config = WorldConfigBlockObject(centre=(2.0, 3.0, 4.0))
     source = MeshBlockObject(mesh_data=pv.Sphere(radius=1.0))
+    start_time = WorldTime(0, 0, 0, 0, 0, 0)
     island = IslandBlockObject(
         mesh_block=source,
         world_config=world_config,
         core_offset=5.0,
         orbit_normal=(0.0, 0.0, 1.0),
         orbit_angle=90.0,
+        reference_time=start_time,
         orbit_speed=30.0,
     )
     island.commit(IslandTask(island).process(island.prepare()))
     initial_points = np.asarray(island.mesh_data.points).copy()
 
-    transform = island.orbit_transform_at_time(3.0)
+    next_time = start_time.advance(WorldTimeDelta(seconds=3))
+    transform = island.orbit_transform_at_time(next_time)
     homogeneous_points = np.column_stack(
         (np.asarray(island.mesh_data.points), np.ones(island.mesh_data.n_points))
     )
@@ -331,14 +341,17 @@ def test_island_orbit_transform_moves_baked_mesh_without_rebuilding_it():
 
 
 def test_island_orbit_normal_is_normalized_and_controls_angle_motion():
+    start_time = WorldTime(0, 0, 0, 0, 0, 0)
     island = IslandBlockObject(
         orbit_normal=(0.0, 0.0, 2.0),
         orbit_angle=10.0,
         orbit_speed=15.0,
+        reference_time=start_time,
     )
-
+    next_time = start_time.advance(WorldTimeDelta(seconds=4))
     assert island.orbit_normal == (0.0, 0.0, 1.0)
-    assert island.orbit_angle_at_time(4.0) == 70.0
+    assert island.orbit_angle_at_time(next_time) == 70.0
+    
 
 
 def test_island_orbit_frame_is_orthonormal_at_both_poles():
@@ -374,6 +387,7 @@ def test_island_mesh_local_up_follows_radial_direction_at_poles():
                 "core_offset": 5.0,
                 "orbit_normal": (0.0, 1.0, 0.0),
                 "orbit_angle": orbit_angle,
+                "reference_time": WorldTime(0, 0, 0, 0, 0, 0),
             }
         )
 

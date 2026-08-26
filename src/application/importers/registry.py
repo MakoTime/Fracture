@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 src_path = "src."
 
+
 class ImportBindingRegistry:
     """Registry for feature-owned object importer bindings."""
 

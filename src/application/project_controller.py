@@ -15,9 +15,10 @@ from src.application.importers.transform_controller import TransformController
 from src.application.importers.world_config_controller import WorldConfigController
 from src.application.project_serializer import ProjectSerializer
 from src.components.tree import TreeManager, TreeModel
-from src.components.tree.roots import root_objects
-from src.menu import setup_menu
+from src.components.tree.roots import root_objects, world_state
+from src.components.world_state.model import WorldStateModel
 from src.dialog.notify import create_notification
+from src.menu import setup_menu
 
 
 class ProjectController:
@@ -55,11 +56,14 @@ class ProjectController:
         self.window.engine_runner = self.window.engineRunner
         self._lock_scene_docks()
         self.window.worldStateView.set_scene_model(self.window.scene_viewer.scene_model)
+        self.world_state_model = WorldStateModel.from_object(world_state)
+        self.window.worldStateView.initialize_model(self.world_state_model)
         self.object_importer = ObjectImporterModel(
             table_model=self.table_model,
             tree_manager=self.tree_manager,
             scene_viewer=self.window.scene_viewer,
             tree_model=self.tree_model,
+            world_state_model=self.world_state_model,
         )
         self.object_importer.set_project_save_callback(self._save_project_after_block)
         self.window.worldStateView.timer_controller = (

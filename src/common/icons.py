@@ -1,9 +1,6 @@
-import sys
-from pathlib import Path
-
 from PySide6.QtGui import QIcon
-from src.common.resources import resource_path
 
+from src.common.resources import resource_path
 
 ICON_DIRECTORY = resource_path("icons")
 
@@ -15,6 +12,9 @@ def _icon(filename: str) -> QIcon:
 ALERT_OCTAGON_ICON = _icon("alert_octagon.svg")
 BIN_ICON = _icon("bin.svg")
 BLOOD_DROP_ICON = _icon("blood_drop.svg")
+CLOCK_ICON = _icon("clock.svg")
+CLOCK_DOWNLOAD_ICON = _icon("clock_download.svg")
+CLOCK_UPLOAD_ICON = _icon("clock_upload.svg")
 COLOUR_PALETTE_ICON = _icon("colour_palette.svg")
 DASHBOARD_WARNING_ICON = _icon("dashboard_warning.svg")
 EARTH_ICON = _icon("earth.svg")
@@ -48,6 +48,9 @@ ICONS = {
     "bin": BIN_ICON,
     "blood_drop": BLOOD_DROP_ICON,
     "colour_palette": COLOUR_PALETTE_ICON,
+    "clock": CLOCK_ICON,
+    "clock_download": CLOCK_DOWNLOAD_ICON,
+    "clock_upload": CLOCK_UPLOAD_ICON,
     "dashboard_warning": DASHBOARD_WARNING_ICON,
     "earth": EARTH_ICON,
     "floating_island": FLOATING_ISLAND_ICON,

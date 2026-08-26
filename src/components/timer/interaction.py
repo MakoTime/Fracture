@@ -3,6 +3,9 @@ from collections import OrderedDict
 import numpy as np
 import vtk
 
+from src.common.calendar import WorldClock, WorldTime
+from src.common.calendar.time import WorldTimeDelta
+
 
 class TimerInterface:
     """Runtime timer representation for one application object."""
@@ -10,20 +13,30 @@ class TimerInterface:
     def __init__(self, object_base):
         self.object_base = object_base
 
-    def update(self, elapsed_seconds, delta_seconds):
+    def update(self, current_time, delta_seconds):
         update = getattr(self.object_base, "update_at_time", None)
         if not callable(update):
             return None
-        return update(elapsed_seconds, delta_seconds)
+        return update(current_time, delta_seconds)
 
 
 class TimerController:
     """Dispatch simulation time to registered object representations."""
 
-    def __init__(self, scene_viewer=None):
+    def __init__(self, scene_viewer=None, start_time=None):
         self.scene_viewer = scene_viewer
-        self.elapsed_seconds = 0.0
+
+        if start_time is None:
+            start_time = WorldTime.now()
+        elif not isinstance(start_time, WorldTime):
+            raise TypeError("start_time must be a WorldTime instance")
+
+        self.current_time = start_time
         self._interfaces = OrderedDict()
+
+    @property
+    def time(self):
+        return self.current_time
 
     def attach(self, object_base):
         interface = TimerInterface(object_base)
@@ -45,19 +58,39 @@ class TimerController:
     def clear(self):
         for object_base in tuple(self._interfaces):
             self.detach(object_base)
-        self.elapsed_seconds = 0.0
 
     def advance(self, delta_seconds):
         delta_seconds = float(delta_seconds)
-        self.elapsed_seconds += delta_seconds
+        return self.set_time(
+            self.current_time.advance(
+                WorldTimeDelta(milliseconds=delta_seconds * 1000)
+            ),
+            delta_seconds=delta_seconds,
+        )
+
+    def set_time(self, value, delta_seconds=None):
+        """Set the simulation time and update all attached objects."""
+        if not isinstance(value, WorldTime):
+            raise TypeError("value must be a WorldTime instance")
+        if delta_seconds is None:
+            delta_seconds = (value - self.current_time).total_seconds()
+        delta_seconds = float(delta_seconds)
+        self.current_time = value
+        WorldClock.set(self.current_time)
+
         for interface in tuple(self._interfaces.values()):
-            transform = interface.update(self.elapsed_seconds, delta_seconds)
+            transform = interface.update(
+                self.current_time,
+                delta_seconds,
+            )
+
             if transform is not None and self.scene_viewer is not None:
                 self.scene_viewer.set_object_transform(
                     interface.object_base,
                     transform,
                 )
-        return self.elapsed_seconds
+
+        return self.current_time
 
 
 def as_vtk_matrix(transform):

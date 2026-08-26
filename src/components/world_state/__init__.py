@@ -1,4 +1,4 @@
-from .model import WorldStateModel
+from .model import WorldMeshModel
 from .view import WorldStateView
 
-__all__ = ["WorldStateModel", "WorldStateView"]
+__all__ = ["WorldMeshModel", "WorldStateView"]

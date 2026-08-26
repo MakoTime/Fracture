@@ -8,11 +8,19 @@ from .registry import ImportBindingRegistry
 class ObjectImporterModel:
     """Register domain objects with the active project targets."""
 
-    def __init__(self, table_model, tree_manager, scene_viewer, tree_model=None):
+    def __init__(
+        self,
+        table_model,
+        tree_manager,
+        scene_viewer,
+        tree_model=None,
+        world_state_model=None,
+    ):
         self.table_model = table_model
         self.tree_manager = tree_manager
         self.scene_viewer = scene_viewer
         self.tree_model = tree_model
+        self.world_state_model = world_state_model
         self.block_data_directory = None
         self.project_save_callback = None
         self._project_save_in_progress = False
@@ -62,6 +70,8 @@ class ObjectImporterModel:
 
             object_base._importer_destruction_callback = remove_table_row
             block.add_destruction_callback(remove_table_row)
+        timer_interface = self.timer_controller.attach(object_base)
+        timer_interface.update(self.timer_controller.time, 0.0)
         if isinstance(object_base, ViewableMixin):
             object_base.register(
                 tree_manager=self.tree_manager,
@@ -73,7 +83,6 @@ class ObjectImporterModel:
             object_base.register(self.tree_manager, parent=parent)
         self.sync_block_child_nodes()
         self.shape_controller.attach(object_base)
-        self.timer_controller.attach(object_base)
         if not add_to_scene:
             self._refresh_tree()
             return object_base

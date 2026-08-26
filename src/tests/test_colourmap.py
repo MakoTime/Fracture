@@ -4,9 +4,8 @@ import numpy as np
 import pytest
 import pyvista as pv
 
-from src.components.tree.roots import root_objects
 from src.components.tree import TreeManager, TreeSearch
-from src.components.tree.roots import colourmap_root, transform_root
+from src.components.tree.roots import colourmap_root, root_objects, transform_root
 from src.dialog.colourmap import ColourmapModel, create_colourmap_dialog
 from src.dialog.colourmap.graph import ColourmapPreview
 from src.dialog.mesh_colourmap import MeshColourmapModel

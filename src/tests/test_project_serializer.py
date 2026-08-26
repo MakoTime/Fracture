@@ -4,18 +4,17 @@ from types import SimpleNamespace
 import pyvista as pv
 from PySide6.QtGui import QColor, QImage
 
-from src.components.tree.roots import (
-    root_objects,
-)
 from src.application.importers import ObjectImporterModel
 from src.application.project_serializer import ProjectSerializer
 from src.application.project_version import upgrade_project_data
+from src.common.calendar import WorldClock, WorldTime
 from src.components.table import TableManager, TableModel
 from src.components.tree import TreeManager, TreeModel
 from src.components.tree.roots import (
     colourmap_root,
     island_root,
     mesh_root,
+    root_objects,
     transform_root,
     world_config,
 )
@@ -199,6 +198,7 @@ def test_project_round_trip_preserves_island_orbital_configuration(tmp_path):
         curve_mesh=True,
         mesh_data=pv.Sphere(radius=1.0),
         guid="island-guid",
+        reference_time=WorldTime(2026, 0, 0, 0, 0, 0),
     )
     island = Island(
         name="Orbiting island",
@@ -215,6 +215,15 @@ def test_project_round_trip_preserves_island_orbital_configuration(tmp_path):
     assert item["orbit_normal"] == [0.0, 1.0, 0.0]
     assert item["orbit_angle"] == 18.0
     assert item["curve_mesh"] is True
+    assert item["reference_time"] == {
+        "year": 2026,
+        "month": 0,
+        "day": 0,
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0,
+        "milliseconds": 0,
+    }
 
     ProjectSerializer().load(
         project_file,
@@ -229,6 +238,10 @@ def test_project_round_trip_preserves_island_orbital_configuration(tmp_path):
     assert restored.block_object.orbit_normal == (0.0, 1.0, 0.0)
     assert restored.block_object.orbit_angle == 18.0
     assert restored.block_object.curve_mesh is True
+    assert restored.block_object.reference_time == WorldTime(2026, 0, 0, 0, 0, 0)
+    assert WorldClock.now() == WorldTime.from_dict(
+        saved["world_state"]["date_time"]
+    )
     assert restored.block_object.mesh_block is not None
     assert restored.block_object.world_config is world_config.block_object
     assert restored.show_in_scene is True
@@ -463,12 +476,59 @@ def test_processed_block_can_be_persisted_and_released(tmp_path):
 def test_project_version_upgrades_legacy_metadata():
     upgraded = upgrade_project_data({"format": 1, "objects": []})
 
-    assert upgraded == {"version": 1, "objects": []}
+    assert upgraded["version"] == "2.0.0"
+    assert upgraded["world_state"]["date_time"] == {
+        "year": 0,
+        "month": 0,
+        "day": 0,
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0,
+        "milliseconds": 0,
+    }
+
+
+def test_project_version_upgrades_legacy_datetime_world_state():
+    upgraded = upgrade_project_data(
+        {
+            "version": "1.0.0",
+            "world_state": {
+                "date_time": "2026-08-26T12:34:56",
+                "saved_times": {
+                    "rows": [
+                        {
+                            "name": "Legacy",
+                            "date_time": "2026-08-27T01:02:03.500000",
+                        }
+                    ]
+                },
+            },
+        }
+    )
+
+    assert upgraded["world_state"]["date_time"] == {
+        "year": 2026,
+        "month": 7,
+        "day": 25,
+        "hours": 12,
+        "minutes": 34,
+        "seconds": 56,
+        "milliseconds": 0,
+    }
+    assert upgraded["world_state"]["saved_times"]["rows"][0]["date"] == {
+        "year": 2026,
+        "month": 7,
+        "day": 26,
+        "hours": 1,
+        "minutes": 2,
+        "seconds": 3,
+        "milliseconds": 500,
+    }
 
 
 def test_project_version_rejects_newer_metadata():
     try:
-        upgrade_project_data({"version": 2, "objects": []})
+        upgrade_project_data({"version": "3.0.0", "objects": []})
     except ValueError as error:
         assert "newer" in str(error)
     else:

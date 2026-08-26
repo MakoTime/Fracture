@@ -1,7 +1,6 @@
 import json
 from types import SimpleNamespace
 
-from src.main import load_application_window, load_file_window
 from src.application.file_window import (
     ProjectEntry,
     ProjectListModel,
@@ -12,7 +11,8 @@ from src.application.file_window import (
 from src.application.project_controller import ProjectController
 from src.application.project_serializer import ProjectSerializer
 from src.components.table import TableManager, TableModel
-from src.components.world_state import WorldStateModel
+from src.components.world_state import WorldMeshModel
+from src.main import load_application_window, load_file_window
 
 
 def test_recent_project_store_remembers_newest_project(tmp_path):
@@ -63,7 +63,7 @@ def test_new_project_selection_creates_project_folder(tmp_path):
 
 
 def test_world_state_model_summarizes_scene_state():
-    model = WorldStateModel()
+    model = WorldMeshModel()
     model.refresh()
 
     assert model.rowCount() == 3

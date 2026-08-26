@@ -43,8 +43,8 @@ def _orbit_frame(orbit_normal, orbit_angle):
     return radial_direction, tangent_direction, local_up
 
 
-def build_island_mesh(prepared):
-    """Copy and orient a source mesh around the configured world centre."""
+def build_island_mesh(prepared, base_reference_time=None):
+    """Copy and orient a source mesh at the requested simulation time."""
     source = prepared["mesh_data"]
     if source is None or not hasattr(source, "copy"):
         raise ValueError("Island source mesh must be renderable mesh data")
@@ -66,9 +66,17 @@ def build_island_mesh(prepared):
     if normal_length <= 1e-12:
         raise ValueError("Island orbit normal must not be zero")
     orbit_normal /= normal_length
+
     orbit_angle = float(prepared.get("orbit_angle", 0.0)) + float(
         prepared.get("orbit_phase", 0.0)
     )
+    if base_reference_time is None:
+        base_reference_time = prepared["reference_time"]
+    elapsed_seconds = (
+        base_reference_time - prepared["reference_time"]
+    ).total_seconds()
+    orbit_angle += float(prepared.get("orbit_speed", 0.0)) * elapsed_seconds
+
     radial_direction, tangent_direction, local_up = _orbit_frame(
         orbit_normal, orbit_angle
     )
@@ -90,6 +98,7 @@ def build_island_mesh(prepared):
     mesh.points = np.asarray(mesh.points) @ rotation.T
     mesh.translate(current_position, inplace=True)
     return mesh
+
 
 
 class IslandTask:

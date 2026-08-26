@@ -144,6 +144,7 @@ class ObjectBase:
         metadata: dict[str, Any] | None = None,
         guid: str | None = None,
         auto_register_root: bool = True,
+        register_in_tree: bool = True,
     ):
         self.name = name
         self.guid = guid or str(uuid4())

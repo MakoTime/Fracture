@@ -7,6 +7,8 @@ from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from pyvistaqt import QtInteractor
 
+from src.components.timer import as_vtk_matrix
+
 from .model import SceneModel
 from .sky_dome import SkyDome
 
@@ -353,6 +355,9 @@ class SceneViewer(QWidget):
             )
 
         actor.SetVisibility(bool(getattr(object_base, "visible", True)))
+        transform = getattr(object_base, "current_transform", None)
+        if transform is not None:
+            actor.SetUserMatrix(as_vtk_matrix(transform))
         self._actors[object_base] = actor
         self.scene_model.add_object(object_base)
         self.reset_camera()

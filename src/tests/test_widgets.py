@@ -1,7 +1,17 @@
-from PySide6.QtCore import QDate, QDateTime, QTime
+from datetime import datetime, timezone
 
+from src.common.calendar import (
+    Calendar,
+    CalendarEpoch,
+    DateModel,
+    DayLength,
+    Era,
+    Month,
+    WorldTime,
+)
 from src.components.table import TableManager, TableView
 from src.components.world_state import WorldStateView
+from src.components.world_state.model import WorldStateModel
 from src.dialog.mesh_import.model import MeshImportModel
 from src.dialog.mesh_import.view import MeshImportView
 from src.objects.mesh_object import MeshObject
@@ -14,6 +24,11 @@ from src.tools.widgets import (
     PlayPauseWidget,
     RewindWidget,
     VisibleWidget,
+)
+from src.tools.widgets.world_calendar import (
+    QWorldCalendarPopup,
+    QWorldDateEdit,
+    QWorldTimeEdit,
 )
 
 
@@ -120,7 +135,7 @@ def test_world_state_view_has_time_above_date(qapp):
     view = WorldStateView()
 
     assert view.time_spinbox.displayFormat() == "HH:mm:ss"
-    assert view.date_spinbox.displayFormat() == "yyyy-MM-dd"
+    assert view.date_spinbox.displayFormat() == "dd/MM/yyyy"
     assert [
         view.rate_combo.itemData(index) for index in range(view.rate_combo.count())
     ] == [
@@ -132,33 +147,216 @@ def test_world_state_view_has_time_above_date(qapp):
         "years",
     ]
 
+    assert view.layout().indexOf(view.datetime_table) >= 0
+
+
+def test_saved_time_actions_mutate_rows_through_world_state_model(qapp):
+    view = WorldStateView()
+    first_time = WorldTime(2026, 0, 1, 1, 2, 3)
+    second_time = WorldTime(2026, 0, 2, 4, 5, 6)
+
+    view.model.date_time = first_time
+    view._handle_saved_time_action(0, "save")
+    assert view.model.saved_time_count == 1
+    assert view.model.saved_time_at(0).date == first_time
+
+    view.model.date_time = second_time
+    view._handle_saved_time_action(0, "save")
+    assert view.model.saved_time_count == 1
+    assert view.model.saved_time_at(0).date == second_time
+
+    view._handle_saved_time_action(0, "remove")
+    assert view.model.saved_time_count == 0
+    assert view.datetime_table.table_model.rowCount() == 1
+
+
+def test_saved_times_table_refreshes_after_world_state_load(qapp):
+    view = WorldStateView()
+    view.initialize_model(WorldStateModel.from_object(view.model.world_state_object))
+    loaded_time = WorldTime(2026, 2, 4, 7, 8, 9)
+    loaded_data = {
+        "name": "World State",
+        "date_time": loaded_time.to_dict(),
+        "saved_times": {
+            "rows": [{"name": "Imported time", "date": loaded_time.to_dict()}]
+        },
+    }
+
+    view.model.world_state_object.deserialise_to_block(loaded_data)
+
+    assert view.model.saved_time_count == 1
+    assert view.datetime_table.table_model.rowCount() == 2
+    assert view.datetime_table.table_model.data(
+        view.datetime_table.table_model.index(0, 0)
+    ) == "Imported time"
+
+
+def test_calendar_popup_offsets_month_start_from_epoch_weekday(qapp):
+    calendar = Calendar(
+        day_length=DayLength(24, 0, 0),
+        weekdays=("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"),
+        seasons=(),
+        months=(Month("first", "First", 30), Month("second", "Second", 31)),
+        eras={},
+        epoch=CalendarEpoch(
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            year=0,
+            month=0,
+            day=0,
+        ),
+    )
+    popup = QWorldCalendarPopup(calendar, DateModel(0, 1, 0))
+
+    assert popup._grid.itemAtPosition(1, 2).widget().text() == "1"
+
+
+def test_calendar_popup_uses_fixed_size_cells(qapp):
+    calendar = Calendar(
+        day_length=DayLength(24, 0, 0),
+        weekdays=("Mon", "Tue"),
+        seasons=(),
+        months=(Month("first", "First", 30),),
+        eras={"BCE": Era(None, -1)},
+        epoch=CalendarEpoch(
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            year=0,
+            month=0,
+            day=0,
+        ),
+    )
+    popup = QWorldCalendarPopup(calendar, DateModel(0, 0, 0))
+
+    assert popup._grid.itemAtPosition(0, 0).widget().size() == popup._CELL_SIZE
+    assert popup._grid.itemAtPosition(1, 0).widget().size() == popup._CELL_SIZE
+
+
+def test_calendar_popup_displays_signed_year_and_short_weekdays(qapp):
+    calendar = Calendar(
+        day_length=DayLength(24, 0, 0),
+        weekdays=("Monday", "Tuesday"),
+        seasons=(),
+        months=(Month("first", "First", 30),),
+        eras={"BCE": Era(None, -1)},
+        epoch=CalendarEpoch(
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            year=0,
+            month=0,
+            day=0,
+        ),
+    )
+    popup = QWorldCalendarPopup(calendar, DateModel(-500, 0, 0))
+
+    assert popup._year.text() == "-500"
+    assert popup._grid.itemAtPosition(0, 0).widget().text() == "Mo"
+    assert popup._grid.itemAtPosition(0, 1).widget().text() == "Tu"
+
+
+def test_calendar_popup_grows_for_months_with_more_week_rows(qapp):
+    calendar = Calendar(
+        day_length=DayLength(24, 0, 0),
+        weekdays=("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"),
+        seasons=(),
+        months=(Month("short", "Short", 28), Month("long", "Long", 35)),
+        eras={"BCE": Era(None, -1)},
+        epoch=CalendarEpoch(
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            year=0,
+            month=0,
+            day=0,
+        ),
+    )
+    popup = QWorldCalendarPopup(calendar, DateModel(0, 0, 0))
+    short_height = popup.height()
+
+    popup.setDate(DateModel(0, 1, 0))
+
+    assert popup.height() > short_height
+
 
 def test_world_state_media_controls_advance_selected_time(qapp):
     view = WorldStateView()
-    view.date_spinbox.setDate(QDate(2026, 1, 31))
-    view.time_spinbox.setTime(QTime(23, 59, 59))
+    view.model.date_time = WorldTime(2026, 0, 30, 23, 59, 59)
 
     view.rate_combo.setCurrentIndex(0)
     view.play_pause_button.click()
     view._advance_time(1000)
-    assert view.date_spinbox.date() == QDate(2026, 2, 1)
-    assert view.time_spinbox.time() == QTime(0, 0, 0)
+    assert view.date_spinbox.date() == DateModel(2026, 1, 0)
+    assert view.time_spinbox.time() == WorldTime(2026, 1, 0, 0, 0, 0)
 
     view.fast_forward_button.click()
     view._advance_time(1000)
-    assert view.time_spinbox.time() == QTime(0, 0, 2)
+    assert view.time_spinbox.time().seconds == 4
 
     view.fast_forward_button.click()
     view._advance_time(1000)
-    assert view.time_spinbox.time() == QTime(0, 0, 6)
+    assert view.time_spinbox.time().seconds == 12
 
     view.fast_forward_button.click()
     view._advance_time(1000)
-    assert view.time_spinbox.time() == QTime(0, 0, 14)
+    assert view.time_spinbox.time().seconds == 14
 
     view.rate_combo.setCurrentIndex(4)
     view._advance_time(1000)
-    assert view.date_spinbox.date() == QDate(2026, 10, 1)
+    assert view.date_spinbox.date() == DateModel(2026, 3, 0)
+
+
+def test_world_date_edit_commits_valid_text_on_editing_finished(qapp):
+    widget = QWorldDateEdit(WorldTime(2026, 0, 0, 0, 0, 0))
+    widget.setDisplayFormat("dd/MM/yyyy")
+    widget._editor.setText("02/03/2026")
+
+    widget._editor.editingFinished.emit()
+
+    assert widget.date() == DateModel(2026, 2, 1)
+
+
+def test_world_date_edit_reverts_invalid_text_on_editing_finished(qapp):
+    widget = QWorldDateEdit(WorldTime(2026, 0, 0, 0, 0, 0))
+    widget.setDisplayFormat("dd/MM/yyyy")
+    widget._editor.setText("32/03/2026")
+
+    widget._editor.editingFinished.emit()
+
+    assert widget.date() == DateModel(2026, 0, 0)
+    assert widget._editor.text() == "01/01/2026"
+
+
+def test_world_date_edit_shows_the_current_era(qapp):
+    calendar = Calendar(
+        day_length=DayLength(24, 0, 0),
+        weekdays=("Mon",),
+        seasons=(),
+        months=(Month("jan", "January", 31),),
+        eras={"BCE": Era(None, -1), "Current": Era(0, None)},
+        epoch=CalendarEpoch(datetime(2026, 1, 1, tzinfo=timezone.utc)),
+    )
+    widget = QWorldDateEdit()
+    widget.setCalendar(calendar)
+    widget.setDate(DateModel(-1, 0, 0))
+
+    assert widget._era_label.text() == "BCE"
+
+    widget.setDate(DateModel(0, 0, 0))
+
+    assert widget._era_label.text() == "Current"
+
+
+def test_world_date_edit_displays_negative_years_as_absolute_values(qapp):
+    widget = QWorldDateEdit()
+    widget.setDisplayFormat("yyyy/MM/dd")
+    widget.setCalendar(
+        Calendar(
+            day_length=DayLength(24, 0, 0),
+            weekdays=("Mon",),
+            seasons=(),
+            months=(Month("jan", "January", 31),),
+            eras={"BCE": Era(None, -1)},
+            epoch=CalendarEpoch(datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        )
+    )
+    widget.setDate(DateModel(-500, 0, 0))
+
+    assert widget._editor.text() == "0500/01/01"
 
 
 def test_world_state_datetime_edits_advance_timer_interfaces(qapp):
@@ -171,28 +369,54 @@ def test_world_state_datetime_edits_advance_timer_interfaces(qapp):
 
     timer_controller = TimerController()
     view = WorldStateView(timer_controller=timer_controller)
-    view.date_spinbox.setDate(QDate(2026, 1, 1))
-    view.time_spinbox.setTime(QTime(0, 0, 0))
-    view._last_datetime = QDateTime(QDate(2026, 1, 1), QTime(0, 0, 0))
+    view.model.date_time = WorldTime(2026, 0, 0, 0, 0, 0)
 
-    view.time_spinbox.setTime(QTime(0, 0, 5))
-    view.time_spinbox.editingFinished.emit()
+    view.time_spinbox.setTime(WorldTime(2026, 0, 0, 0, 0, 5))
+    view._datetime_edited()
 
     assert timer_controller.deltas == [5.0]
 
 
 def test_world_state_time_advancement_interpolates(qapp):
     view = WorldStateView()
-    view.date_spinbox.setDate(QDate(2026, 1, 1))
-    view.time_spinbox.setTime(QTime(0, 0, 0))
+    view.model.date_time = WorldTime(2026, 0, 0, 0, 0, 0)
 
     view.play_pause_button.click()
     view._advance_time(500)
 
-    assert view.time_spinbox.time() == QTime(0, 0, 0, 500)
+    assert view.time_spinbox.time().seconds == 0
+    assert view.time_spinbox.time().milliseconds == 500
 
     view._advance_time(500)
-    assert view.time_spinbox.time() == QTime(0, 0, 1, 0)
+    assert view.time_spinbox.time().seconds == 1
+
+
+def test_world_state_time_spinbox_rollover_updates_date(qapp):
+    view = WorldStateView()
+    view.model.date_time = WorldTime(2026, 0, 0, 23, 59, 59)
+
+    view.time_spinbox._hour.spinbox.stepUp()
+
+    assert view.model.date_time == WorldTime(2026, 0, 1, 0, 59, 59)
+    assert view.date_spinbox.date() == DateModel(2026, 0, 1)
+
+
+def test_world_time_edit_wraps_seconds_into_minutes(qapp):
+    widget = QWorldTimeEdit()
+    widget.setTime(WorldTime(2026, 0, 0, 0, 0, 59))
+
+    widget._second.spinbox.stepUp()
+
+    assert widget.time() == WorldTime(2026, 0, 0, 0, 1, 0)
+
+
+def test_world_time_edit_wraps_hours_into_custom_calendar_day(qapp):
+    widget = QWorldTimeEdit()
+    widget.setTime(WorldTime(2026, 0, 0, 23, 59, 59))
+
+    widget._hour.spinbox.stepUp()
+
+    assert widget.time() == WorldTime(2026, 0, 1, 0, 59, 59)
 
 
 def test_visible_widget_switches_icon_state_and_highlights(qapp):

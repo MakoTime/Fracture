@@ -13,16 +13,17 @@ def _load_special_roots():
     global _special_roots_loaded
     if _special_roots_loaded:
         return
-    from .world_config_root import world_config
+    from .world_config_root import world_config, world_state
 
     root_objects.protect(world_config.node)
     root_objects.protect(island_root)
     globals()["world_config"] = world_config
+    globals()["world_state"] = world_state
     _special_roots_loaded = True
 
 
 def __getattr__(name):
-    if name == "world_config":
+    if name in ("world_config", "world_state"):
         _load_special_roots()
         return globals()[name]
     raise AttributeError(name)
@@ -35,4 +36,5 @@ __all__ = [
     "root_objects",
     "transform_root",
     "world_config",
+    "world_state",
 ]

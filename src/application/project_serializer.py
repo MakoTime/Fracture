@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pyvista as pv
 
-from src.application.project_version import CURRENT_PROJECT_VERSION, upgrade_project_data
+from src.common.calendar import WorldClock, WorldTime
+from src.application.project_version import (
+    CURRENT_PROJECT_VERSION,
+    upgrade_project_data,
+)
 from src.components.tree.roots import (
     colourmap_root,
     island_root,
@@ -11,6 +15,7 @@ from src.components.tree.roots import (
     root_objects,
     transform_root,
     world_config,
+    world_state,
 )
 from src.dialog.perlin_noise_transform import PerlinNoiseTransformModel
 from src.engine.block_objects import (
@@ -20,6 +25,7 @@ from src.engine.block_objects import (
     MeshBlockObject,
     PerlinNoiseTransformBlockObject,
     ProceduralMeshBlock,
+    WorldStateBlockObject,
 )
 from src.objects.colourmap import ColourmapObject
 from src.objects.generated_mesh import GeneratedMesh
@@ -168,6 +174,7 @@ class ProjectSerializer:
                     "orbit_normal": block.orbit_normal,
                     "orbit_angle": block.orbit_angle,
                     "curve_mesh": block.curve_mesh,
+                    "reference_time": block.reference_time.to_dict(),
                     "block_data": f"{BLOCK_DATA_DIRECTORY}/{block_path.name}",
                 }
             )
@@ -176,6 +183,7 @@ class ProjectSerializer:
             "version": CURRENT_PROJECT_VERSION,
             "objects": objects,
             "world_config": world_config.block_object.to_json(),
+            "world_state": world_state.serialise_from_block(),
         }
         directory.mkdir(parents=True, exist_ok=True)
         project_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -209,14 +217,22 @@ class ProjectSerializer:
                 name=saved_world_config.get("name", world_config.name),
                 centre=tuple(saved_world_config.get("centre", world_config.centre)),
             )
-        for item in data.get("objects", []):
-            if item.get("type") == "world_config":
-                world_config.update_configuration(
-                    name=item.get("name", world_config.name),
-                    centre=tuple(item.get("centre", world_config.centre)),
-                )
-            else:
-                pending.append(item)
+
+        world_config_data = data.get("world_config")
+        if world_config_data is not None:
+            world_config.update_configuration(
+                name=world_config_data.get("name", world_config.name),
+                centre=tuple(world_config_data.get("centre", world_config.centre)),
+            )
+        world_state_data = data.get("world_state")
+        if world_state_data is not None:
+            world_state.deserialise_to_block(world_state_data)
+            WorldClock.set(world_state.date_time)
+            timer_controller = getattr(object_importer, "timer_controller", None)
+            if timer_controller is not None:
+                timer_controller.current_time = world_state.date_time
+
+        pending = [item for item in data.get("objects", [])]
         while pending:
             remaining = []
             for item in pending:
@@ -284,6 +300,11 @@ class ProjectSerializer:
                         orbit_normal=item.get("orbit_normal", (0.0, 0.0, 1.0)),
                         orbit_angle=item.get("orbit_angle", 0.0),
                         curve_mesh=item.get("curve_mesh", False),
+                        reference_time=WorldTime.from_dict(
+                            item["reference_time"]
+                        )
+                        if item.get("reference_time") is not None
+                        else WorldTime.now(),
                         serialised_path=project_path.parent / item["block_data"],
                     )
                     island = Island(
@@ -542,5 +563,6 @@ class ProjectSerializer:
             island_root,
             world_config.node,
         ]
+        world_state.clear()
         if tree_model is not None:
             tree_model.endResetModel()

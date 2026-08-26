@@ -194,17 +194,44 @@ class ColourmapBlockObject(BlockObject):
                 "field2_curve_points": field2_curve_points,
                 "field2_curve_handles": field2_curve_handles,
                 "noise_enabled": bool(self.noise_enabled),
+                "perlin_noise_transform": self.perlin_noise_transform,
             }
         )
 
-    def process(self, prepared, progress_callback=None):
+    def process(
+        self,
+        prepared,
+        progress_callback=None,
+        values=None,
+        fields=None,
+        skip_noise=False,
+    ):
+        if values is not None and fields is not None:
+            raise ValueError("Colourmap process cannot receive both values and fields")
+        if values is not None:
+            result = self._apply_values(prepared, values, skip_noise=skip_noise)
+        elif fields is not None:
+            try:
+                field1, field2 = fields
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    "Colourmap fields must contain exactly two arrays"
+                ) from error
+            result = self._apply_fields(prepared, field1, field2)
+        else:
+            self.validate()
+            result = self
         if progress_callback:
             progress_callback(1.0)
-        self.validate()
-        return self
+        return result
 
     def calculate_values(self, values, skip_noise=False):
-        return self._apply_values(values, skip_noise=skip_noise)
+        prepared = self.prepare()
+        return self.process(
+            prepared,
+            values=values,
+            skip_noise=skip_noise,
+        )
 
     def calculate_fields(self, fields):
         try:
@@ -213,7 +240,8 @@ class ColourmapBlockObject(BlockObject):
             raise ValueError(
                 "Colourmap fields must contain exactly two arrays"
             ) from error
-        return self._apply_fields(field1, field2)
+        prepared = self.prepare()
+        return self.process(prepared, fields=(field1, field2))
 
     def update_from(self, source):
         for name in (
@@ -253,7 +281,6 @@ class ColourmapBlockObject(BlockObject):
                 source.perlin_noise_transform,
             )
         )
-        self.prepare()
         self.mark_changed()
         return self
 
@@ -296,24 +323,26 @@ class ColourmapBlockObject(BlockObject):
 
     def apply(self, values, skip_noise=False):
         """Map scalar values to interpolated RGBA colours."""
-        self.prepare()
-        return self._apply_values(values, skip_noise=skip_noise)
+        prepared = self.prepare()
+        return self.process(prepared, values=values, skip_noise=skip_noise)
 
-    def _apply_values(self, values, skip_noise=False):
+    def _apply_values(self, prepared, values, skip_noise=False):
         scalar_values = np.asarray(values, dtype=float)
         if (
             not skip_noise
-            and self.noise_enabled
-            and self.perlin_noise_transform is not None
+            and prepared["noise_enabled"]
+            and prepared["perlin_noise_transform"] is not None
         ):
             if scalar_values.ndim > 3:
                 raise ValueError("Colourmap values must have at most 3 dimensions")
             field_shape = scalar_values.shape + (1,) * (3 - scalar_values.ndim)
-            scalar_values = self.perlin_noise_transform.apply(
-                scalar_values.reshape(field_shape)
-            ).reshape(scalar_values.shape)
-        positions = np.asarray([stop[0] for stop in self.stops])
-        colours = np.asarray([stop[1] for stop in self.stops])
+            scalar_values = (
+                prepared["perlin_noise_transform"]
+                .apply(scalar_values.reshape(field_shape))
+                .reshape(scalar_values.shape)
+            )
+        positions = np.asarray([stop[0] for stop in prepared["stops"]])
+        colours = np.asarray([stop[1] for stop in prepared["stops"]])
         clipped = np.clip(scalar_values, positions[0], positions[-1])
         channels = np.stack(
             [
@@ -326,22 +355,22 @@ class ColourmapBlockObject(BlockObject):
 
     def apply_fields(self, field1, field2):
         """Sample the authored two-dimensional colour field at normalized inputs."""
-        self.prepare()
-        return self._apply_fields(field1, field2)
+        prepared = self.prepare()
+        return self.process(prepared, fields=(field1, field2))
 
-    def _apply_fields(self, field1, field2):
+    def _apply_fields(self, prepared, field1, field2):
         first = np.clip(np.asarray(field1, dtype=float), 0.0, 1.0)
         second = np.clip(np.asarray(field2, dtype=float), 0.0, 1.0)
         if first.shape != second.shape:
             raise ValueError("Colourmap fields must have matching shapes")
         first = self._evaluate_curve(
-            first, self.field1_curve_points, self.field1_curve_handles
+            first, prepared["field1_curve_points"], prepared["field1_curve_handles"]
         )
         second = self._evaluate_curve(
-            second, self.field2_curve_points, self.field2_curve_handles
+            second, prepared["field2_curve_points"], prepared["field2_curve_handles"]
         )
-        x_positions = np.asarray(self.field1_positions, dtype=float)
-        y_positions = np.asarray(self.field2_positions, dtype=float)
+        x_positions = np.asarray(prepared["field1_positions"], dtype=float)
+        y_positions = np.asarray(prepared["field2_positions"], dtype=float)
         x_index = np.clip(
             np.searchsorted(x_positions, first, side="right") - 1,
             0,
@@ -358,7 +387,7 @@ class ColourmapBlockObject(BlockObject):
         y_ratio = (second - y_positions[y_index]) / np.maximum(
             1e-12, y_positions[y_index + 1] - y_positions[y_index]
         )
-        grid = np.asarray(self.colour_grid, dtype=float)
+        grid = np.asarray(prepared["colour_grid"], dtype=float)
         top_left = grid[y_index, x_index]
         top_right = grid[y_index, x_index + 1]
         bottom_left = grid[y_index + 1, x_index]

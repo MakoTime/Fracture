@@ -2,9 +2,8 @@ import pytest
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 
-from src.components.tree.roots import root_objects
 from src.components.tree import TreeModel, TreeSearch
-from src.components.tree.roots import colourmap_root, transform_root
+from src.components.tree.roots import colourmap_root, root_objects, transform_root
 from src.dialog.perlin_noise_transform import (
     PerlinNoiseTransformModel,
     create_perlin_noise_transform_dialog,

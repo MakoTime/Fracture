@@ -8,6 +8,7 @@ import numpy as np
 from .base_block_object import BlockObject
 from .mesh import MeshBlockObject
 from .world_config import WorldConfigBlockObject
+from src.common.calendar import WorldTime
 
 
 @dataclass
@@ -26,11 +27,14 @@ class IslandBlockObject(BlockObject):
     guid: str = field(default_factory=lambda: str(uuid4()))
     comments: str = ""
     serialised_path: Path | None = field(default=None, repr=False, compare=False)
+    reference_time: WorldTime = field(default_factory=WorldTime.now, repr=False, compare=False)
 
     __hash__ = BlockObject.__hash__
 
     def __post_init__(self):
         BlockObject.__init__(self, self.name, self.guid, self.comments)
+        if not isinstance(self.reference_time, WorldTime):
+            raise TypeError("reference_time must be a WorldTime instance")
         self.core_offset = self._normalize_core_offset(self.core_offset)
         self.orbit_speed = float(self.orbit_speed)
         self.orbit_normal = self._normalize_orbit_normal(self.orbit_normal)
@@ -138,13 +142,15 @@ class IslandBlockObject(BlockObject):
             "orbit_normal": self.orbit_normal,
             "orbit_angle": self.orbit_angle,
             "curve_mesh": self.curve_mesh,
+            "reference_time": self.reference_time,
         }
 
-    def orbit_angle_at_time(self, elapsed_seconds):
-        """Return the current orbit angle in degrees for elapsed time."""
-        return self.orbit_angle + self.orbit_speed * float(elapsed_seconds)
+    def orbit_angle_at_time(self, current_time):
+        """Return the current orbit angle in degrees for simulation time."""
+        elapsed_seconds = (current_time - self.reference_time).total_seconds()
+        return self.orbit_angle + self.orbit_speed * elapsed_seconds
 
-    def orbit_transform_at_time(self, elapsed_seconds):
+    def orbit_transform_at_time(self, current_time):
         """Return an actor transform without rebuilding the Island mesh."""
         from src.engine.block_tasks.island import _orbit_frame
 
@@ -154,7 +160,7 @@ class IslandBlockObject(BlockObject):
         )
         current_radial, current_tangent, current_up = _orbit_frame(
             np.asarray(self.orbit_normal),
-            self.orbit_angle_at_time(elapsed_seconds),
+            self.orbit_angle_at_time(current_time),
         )
         initial_frame = np.column_stack((initial_tangent, initial_up, initial_radial))
         current_frame = np.column_stack((current_tangent, current_up, current_radial))
@@ -165,6 +171,7 @@ class IslandBlockObject(BlockObject):
         transform[:3, :3] = linear
         transform[:3, 3] = current_position - linear @ initial_position
         return transform
+
 
     def process(self, prepared, progress_callback=None):
         from src.engine.block_tasks.island import build_island_mesh

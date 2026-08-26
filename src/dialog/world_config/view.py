@@ -11,7 +11,7 @@ class WorldConfigView(PopupEditorView):
     """Popup editor for the singleton world configuration."""
 
     def __init__(self, model: WorldConfigModel, parent=None, deduper=None):
-        super().__init__(model, parent=parent, deduper=deduper)
+        super().__init__(model, parent=parent)
         self.setWindowTitle("Edit World Config")
         self.resize(340, 150)
 

@@ -1,5 +1,4 @@
 import sys
-from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
@@ -13,14 +12,14 @@ from PySide6.QtWidgets import (
 
 from src.application import ProjectController
 from src.application.file_window import FileWindow, ProjectPreview
+from src.common.resources import resource_path
 from src.components.scene import SceneViewer
 from src.components.table import TableView
 from src.components.tree import TreeView
 from src.components.world_state import WorldStateView
+from src.components.world_state.factory import create_world_state_widget
 from src.dialog.notify import create_notification
 from src.engine import EngineRunner
-
-from src.common.resources import resource_path
 
 
 def load_main_window(project_file, menu_bar=None):

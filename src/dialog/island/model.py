@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pyvista as pv
 
+from src.common.calendar import WorldTime
 from src.dialog.base.editor import EditorModel
 from src.engine.block_tasks.island import build_island_mesh
 
@@ -23,6 +24,7 @@ class IslandModel(EditorModel):
     show_in_place: bool = False
     show_path: bool = False
     show_in_scene: bool = True
+    reference_time: WorldTime = field(default_factory=WorldTime.now, repr=False, compare=False)
 
     @classmethod
     def from_island(cls, island):
@@ -41,6 +43,7 @@ class IslandModel(EditorModel):
                 "show_in_scene",
                 island._scene is not None,
             ),
+            reference_time=block.reference_time if hasattr(block, "reference_time") else WorldTime.now(),
         )
 
     def set_source_meshes(self, source_meshes):
@@ -109,7 +112,9 @@ class IslandModel(EditorModel):
                 "orbit_normal": self.orbit_normal,
                 "orbit_angle": self.orbit_angle,
                 "curve_mesh": self.curve_mesh,
-            }
+                "reference_time": self.reference_time,
+            },
+            self.reference_time,
         )
 
     def core_point(self):
@@ -131,6 +136,7 @@ class IslandModel(EditorModel):
                 "orbit_normal": self.orbit_normal,
                 "orbit_angle": orbit_angle,
                 "curve_mesh": self.curve_mesh,
+                "reference_time": self.reference_time,
             }
             points.append(build_island_mesh(prepared).center)
         return pv.lines_from_points(np.asarray(points), close=False)

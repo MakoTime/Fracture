@@ -3,7 +3,10 @@ from uuid import uuid4
 
 from src.engine.block_objects import ColourmapBlockObject
 from src.objects.colourmap import ColourmapObject
-from src.tools.widgets.bezier_graph import normalize_curve_handles, normalize_curve_points
+from src.tools.widgets.bezier_graph import (
+    normalize_curve_handles,
+    normalize_curve_points,
+)
 
 
 @dataclass

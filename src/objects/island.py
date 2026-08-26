@@ -24,6 +24,7 @@ class Island(ViewableMixin, ObjectBase):
         if not isinstance(block, IslandBlockObject):
             raise TypeError("Island requires an IslandBlockObject")
         self.island_block_object = block
+        self.current_transform = None
         super().__init__(
             name=block.name,
             icon=icon if icon is not None else get_icon("floating_island"),
@@ -61,9 +62,10 @@ class Island(ViewableMixin, ObjectBase):
     def curve_mesh(self):
         return self.block_object.curve_mesh
 
-    def update_at_time(self, elapsed_seconds, delta_seconds=0.0):
+    def update_at_time(self, current_time, delta_seconds=0.0):
         del delta_seconds
-        return self.block_object.orbit_transform_at_time(elapsed_seconds)
+        self.current_transform = self.block_object.orbit_transform_at_time(current_time)
+        return self.current_transform
 
     def register_shapes(self, shape_interface):
         if self.block_object.world_config is None or shape_interface.shapes:

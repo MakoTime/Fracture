@@ -109,15 +109,6 @@ class MeshProceduralModel(EditorModel):
         if isinstance(self.dropoff_dimensions, dict):
             self.dropoff_dimensions = DropoffData.from_dict(self.dropoff_dimensions)
 
-    def __setattr__(self, name, value):
-        if (
-            name == "dropoff_dimensions"
-            and value is not None
-            and not isinstance(value, list)
-        ):
-            value = DropoffData.from_list(value)
-        super().__setattr__(name, value)
-
     @classmethod
     def from_procedural_mesh(cls, mesh_object):
         settings = dict(mesh_object.metadata.get("procedural_settings", {}))
